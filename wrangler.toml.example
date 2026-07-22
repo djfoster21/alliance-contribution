@@ -1,0 +1,42 @@
+# Template for wrangler.toml — copy it, then fill in your own values:
+#
+#   cp wrangler.toml.example wrangler.toml
+#
+# wrangler.toml itself is gitignored: it names YOUR Worker and YOUR D1 database, so it is
+# per-deployment config, not shared source. Same pattern as .dev.vars / .dev.vars.example.
+# If you change a binding here, mirror it into this example so other deployments pick it up.
+
+# Your Worker's name. It becomes the hostname: <name>.<your-subdomain>.workers.dev
+name = "alliance-tracker"
+
+main = "src/index.ts"
+compatibility_date = "2026-07-22"
+
+[[d1_databases]]
+binding = "DB"
+
+# Create the database first, then paste its name and id here:
+#   npx wrangler d1 create alliance-tracker-db
+# The command prints both. Everything else (migrations, seed) addresses the database through
+# the "DB" binding above, so these two values are the only place your database name appears.
+database_name = "alliance-tracker-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+migrations_dir = "migrations"
+
+# Rate limiting lives in the Worker rather than the WAF, because WAF rules are zone-level and
+# do not apply to workers.dev. 120 requests per 60s per client IP, applied in front of auth.
+# namespace_id is a local identifier for this binding — any stable integer works.
+[[ratelimits]]
+name = "API_RATE_LIMIT"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60
+
+# Serves the built SPA from dist/. `npm run deploy` builds the SPA before deploying.
+[assets]
+directory = "dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"

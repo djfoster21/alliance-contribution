@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+/*
+  Alliance Tracker — design system.
+  Zinc neutrals, monochrome black accent, medals + traffic-light status as the only
+  color pops. Geist / Geist Mono. Hairline borders + soft card shadows. Numbers are
+  DATA: tabular-nums + monospace.
+*/
+@theme {
+  /* Neutrals (zinc) */
+  --color-background: #fafafa; /* app shell, table headers, row hover */
+  --color-surface: #ffffff; /* cards, main content */
+  --color-subtle: #fafafa; /* alias of background */
+  --color-muted-surface: #f4f4f5; /* chips, segmented tracks, bar tracks */
+  --color-foreground: #18181b;
+  --color-secondary: #3f3f46;
+  --color-muted: #71717a;
+  --color-faint: #a1a1aa;
+  --color-border: #e4e4e7;
+
+  /* Accent — monochrome */
+  --color-accent: #18181b;
+  --color-accent-hover: #27272a;
+  --color-accent-subtle: #f4f4f5;
+  --color-accent-foreground: #ffffff; /* text/icon on bg-accent or bg-foreground */
+
+  /* Semantic — movement / thresholds */
+  --color-up: #16a34a;
+  --color-down: #dc2626;
+  --color-warn: #b45309;
+
+  /* Medals (top-3) */
+  --color-gold: #eab308;
+  --color-silver: #94a3b8;
+  --color-bronze: #d97706;
+
+  /* Medal podium surfaces + text (top-3 cards & rank badges) */
+  --color-gold-bg: #fef9c3;
+  --color-gold-fg: #a16207;
+  --color-gold-tint: #fffef7; /* faint podium-card gradient top */
+  --color-silver-bg: #f1f5f9;
+  --color-silver-fg: #475569;
+  --color-bronze-bg: #fff7ed;
+  --color-bronze-fg: #b45309;
+  --color-bronze-tint: #fffaf3;
+
+  /* Status surfaces — traffic light + warning banners (bg / border / fg triplets) */
+  --color-good-bg: #dcfce7;
+  --color-good-border: #bbf7d0;
+  --color-good-fg: #166534;
+  --color-watch-bg: #fef9c3;
+  --color-watch-border: #fde68a;
+  --color-watch-fg: #854d0e;
+  --color-risk-bg: #fee2e2;
+  --color-risk-border: #fecaca;
+  --color-risk-fg: #991b1b;
+  --color-flag-bg: #fffbeb;
+  --color-flag-border: #fde68a;
+  --color-flag-fg: #92400e;
+  --color-flag-accent: #b45309;
+
+  /* Activity-type badges (event log) */
+  --color-badge-blue-bg: #eff6ff;
+  --color-badge-blue-fg: #1d4ed8;
+  --color-badge-green-bg: #f0fdf4;
+  --color-badge-green-fg: #15803d;
+  --color-badge-violet-bg: #faf5ff;
+  --color-badge-violet-fg: #7e22ce;
+  --color-badge-sky-bg: #f0f9ff;
+  --color-badge-sky-fg: #0369a1;
+  --color-badge-amber-bg: #fffbeb;
+  --color-badge-amber-fg: #b45309;
+  --color-badge-red-bg: #fef2f2;
+  --color-badge-red-fg: #b91c1c;
+  --color-badge-slate-bg: #f8fafc;
+  --color-badge-slate-fg: #475569;
+  --color-badge-pink-bg: #fdf2f8;
+  --color-badge-pink-fg: #be185d;
+
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  --radius: 8px;
+
+  --ease-out-quint: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+:root {
+  color-scheme: light;
+}
+
+/*
+  Dark theme — overrides the @theme tokens under .dark on <html>. Every Tailwind color
+  utility reads var(--color-*), so redefining the vars here flips the whole app; no dark:
+  variants needed. Toggled by lib/theme.ts + the no-flash script in index.html.
+*/
+.dark {
+  color-scheme: dark;
+
+  /* Neutrals (zinc) */
+  --color-background: #09090b;
+  --color-surface: #18181b;
+  --color-subtle: #09090b;
+  --color-muted-surface: #27272a;
+  --color-foreground: #fafafa;
+  --color-secondary: #d4d4d8;
+  --color-muted: #a1a1aa;
+  --color-faint: #71717a;
+  --color-border: #27272a;
+
+  /* Accent — monochrome (inverts to near-white; dark text on top) */
+  --color-accent: #fafafa;
+  --color-accent-hover: #e4e4e7;
+  --color-accent-subtle: #27272a;
+  --color-accent-foreground: #18181b;
+
+  /* Semantic — brighter so they read on dark surfaces */
+  --color-up: #4ade80;
+  --color-down: #f87171;
+  --color-warn: #fbbf24;
+
+  /* Medals (top-3) */
+  --color-gold: #eab308;
+  --color-silver: #cbd5e1;
+  --color-bronze: #f59e0b;
+
+  /* Medal podium surfaces + text — dark tints, bright text */
+  --color-gold-bg: #2e2708;
+  --color-gold-fg: #fde68a;
+  --color-gold-tint: #1a1708;
+  --color-silver-bg: #27272a;
+  --color-silver-fg: #e2e8f0;
+  --color-bronze-bg: #2a1c0a;
+  --color-bronze-fg: #fdba74;
+  --color-bronze-tint: #1a1206;
+
+  /* Status surfaces — traffic light + warning banners (bg / border / fg triplets) */
+  --color-good-bg: #052e16;
+  --color-good-border: #14532d;
+  --color-good-fg: #86efac;
+  --color-watch-bg: #422006;
+  --color-watch-border: #713f12;
+  --color-watch-fg: #fde68a;
+  --color-risk-bg: #450a0a;
+  --color-risk-border: #7f1d1d;
+  --color-risk-fg: #fca5a5;
+  --color-flag-bg: #422006;
+  --color-flag-border: #713f12;
+  --color-flag-fg: #fde68a;
+  --color-flag-accent: #fbbf24;
+
+  /* Activity-type badges — dark tints, bright text */
+  --color-badge-blue-bg: #172554;
+  --color-badge-blue-fg: #93c5fd;
+  --color-badge-green-bg: #052e16;
+  --color-badge-green-fg: #86efac;
+  --color-badge-violet-bg: #2e1065;
+  --color-badge-violet-fg: #d8b4fe;
+  --color-badge-sky-bg: #082f49;
+  --color-badge-sky-fg: #7dd3fc;
+  --color-badge-amber-bg: #451a03;
+  --color-badge-amber-fg: #fcd34d;
+  --color-badge-red-bg: #450a0a;
+  --color-badge-red-fg: #fca5a5;
+  --color-badge-slate-bg: #1e293b;
+  --color-badge-slate-fg: #cbd5e1;
+  --color-badge-pink-bg: #500724;
+  --color-badge-pink-fg: #f9a8d4;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+/*
+  Tailwind v4 Preflight resets interactive elements to cursor: default. Restore the pointer
+  affordance app-wide (buttons, links, role=button); disabled controls keep the default arrow.
+*/
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  a {
+    cursor: pointer;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-border);
+}
+
+/* All numeric data uses tabular monospace figures. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Refined scrollbars */
+.scr::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scr::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scr::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+  border: 3px solid var(--color-surface);
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes popin {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toastin {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

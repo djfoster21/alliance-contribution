@@ -1,0 +1,33 @@
+# CI workflow for alliance-tracker
+#
+# Integration tests provision their own local D1 via @cloudflare/vitest-pool-workers
+# (no Cloudflare credentials needed).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # wrangler.toml is gitignored (per-deployment config). The integration tests read it for
+      # the D1 binding and migrations_dir, so CI works from the committed template. The
+      # placeholder database_id is fine — miniflare provisions a throwaway local D1.
+      - run: cp wrangler.toml.example wrangler.toml
+
+      - run: npx tsc --noEmit
+
+      - run: npm test

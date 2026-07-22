@@ -1,0 +1,30 @@
+{
+  "name": "alliance-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "seed:local": "npx tsx seed/run.ts",
+    "seed:remote": "npx tsx seed/run.ts --remote",
+    "test": "vitest run",
+    "dev:web": "npm --prefix web run dev",
+    "dev:all": "./dev.sh",
+    "build:web": "npm --prefix web run build",
+    "deploy": "npm run build:web && wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.12.31"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.7",
+    "@cloudflare/workers-types": "^5.20260722.1",
+    "@types/node": "^22.20.1",
+    "tsx": "^4.20.6",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.113.0"
+  }
+}

@@ -1,0 +1,14 @@
+/docs/fixtures/beartrap_2026-07-13_trap1.tsv
+/docs/fixtures/castlebattle_bbc_2026-07-18.tsv
+/docs/fixtures
+
+node_modules
+dist/*
+!dist/.gitkeep
+.wrangler
+.dev.vars
+# Per-deployment config: names your Worker and your D1 database. Copy wrangler.toml.example.
+wrangler.toml
+seed/out
+.serena/
+docs/
