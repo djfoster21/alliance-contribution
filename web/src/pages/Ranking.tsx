@@ -73,6 +73,10 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
   const rows = (rankingState.data?.rows ?? []) as WeeklyRankingRow[];
   const possible = rankingState.data?.possible ?? 0;
   const scoreLabel = weekly ? "This-Week Score" : "Season Score";
+  const activityLabel =
+    activity === "all" ? "all activities" : (activities.find((a) => a.key === activity)?.name ?? activity);
+  // Names the attendance column's scope — the original scoping bug existed because it was invisible.
+  const attendanceScope = `Attendance: ${weekly ? "this week" : "season"} · ${activityLabel}`;
   // The weekly payload flags a week with no events of the selected activity; that is the only reliable
   // signal (`possible` is 0 for a tier-less activity, and boards are roster-seeded so rows are never empty).
   const noEvents = weekly && (rankingState.data as WeeklyRankingData | null)?.hasEvents === false;
@@ -152,7 +156,9 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
                   <TableHead>Member</TableHead>
                   <TableHead className="w-[110px]">Alliance Rank</TableHead>
                   <TableHead className="w-[240px]">Score</TableHead>
-                  <TableHead className="w-28 text-right">Attendance</TableHead>
+                  <TableHead className="w-28 text-right" title={attendanceScope}>
+                    Attendance
+                  </TableHead>
                   {weekly && <TableHead className="w-24 text-right">Move</TableHead>}
                 </TableRow>
               </TableHeader>
