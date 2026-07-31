@@ -32,7 +32,7 @@ export class StatsRepo {
   }
 
   // Per member+activity points for one week — the input the service folds into OverallRankingRow.
-  // Optional activityKey re-ranks a single activity (attendance stays global; see stats-service).
+  // Optional activityKey re-ranks a single activity (attendance is scoped alongside; see stats-service).
   async weekScores(
     week: string,
     activityKey?: string,

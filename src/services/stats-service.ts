@@ -27,7 +27,7 @@ export class StatsService {
       return { week: target ?? "", possible: 0, hasEvents: false, rows: [] };
     }
 
-    const attendance = await this.attendanceMap();
+    const attendance = await this.attendanceMap(target, activityKey);
     const possible = await this.statsRepo.weekPossible(target, activityKey);
     const rows = await this.buildRanking(target, activityKey, attendance);
 
@@ -39,6 +39,8 @@ export class StatsService {
       return { week: target, possible, hasEvents: true, rows: rows.map((r) => ({ ...r, movement: null })) };
     }
 
+    // Reuses the TARGET week's attendance map: prior rows exist only to derive priorRank below —
+    // their attendance values are wrong-scope on purpose and must never be returned or sorted on.
     const priorRows = await this.buildRanking(priorWeek, activityKey, attendance);
     const priorRank = new Map<number, number>();
     for (const r of priorRows) priorRank.set(r.member_id, r.rank);
@@ -62,7 +64,7 @@ export class StatsService {
       rows: this.foldRanking(
         await this.statsRepo.rankedMembers(),
         await this.statsRepo.overallScores(activityKey),
-        await this.attendanceMap(),
+        await this.attendanceMap(undefined, activityKey),
       ),
     };
   }
@@ -132,11 +134,12 @@ export class StatsService {
     return { total_event_days: total, rows };
   }
 
-  // member_id -> all-time attendance pct (0..1). Same source as attendance(), reused to embed a
-  // per-member attendance figure in every ranking row (all-activities, never activity-scoped).
-  private async attendanceMap(): Promise<Map<number, number>> {
-    const total = await this.statsRepo.totalEventDays();
-    const counts = await this.statsRepo.attendanceCounts();
+  // member_id -> attendance pct (0..1) in the given scope. Same source as attendance(), reused to
+  // embed a per-member attendance figure in every ranking row. Scope must match the board's scope:
+  // the caller's week/activity filters narrow numerator and denominator together.
+  private async attendanceMap(week?: string, activityKey?: string): Promise<Map<number, number>> {
+    const total = await this.statsRepo.totalEventDays(week, activityKey);
+    const counts = await this.statsRepo.attendanceCounts(week, activityKey);
     return new Map(counts.map((c) => [c.member_id, total ? c.attended / total : 0]));
   }
 

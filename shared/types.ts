@@ -95,7 +95,7 @@ export type OverallRankingRow = {
                                 // every board so rank sits beside contribution (see 2026-07-27 spec).
   score: number; // total points in scope (one week, or all-time)
   breakdown: Record<string, number>; // activity key -> points (only activities scored in)
-  attendance: number; // all-time attendance pct (0..1), same source as /api/attendance
+  attendance: number; // attendance pct (0..1) in the board's scope (its week/activity filters), same source as /api/attendance
   rank: number; // 1-based, after tie-break
 };
 // possible = Σ over events in scope of MAX(tier points) × activity weight — the common denominator

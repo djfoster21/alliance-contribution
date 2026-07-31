@@ -355,7 +355,7 @@ describe("StatsService.overallRanking", () => {
     expect(ranks).toEqual(ranks.map((_, i) => i + 1));
   });
 
-  it("embeds an all-time attendance pct in every ranking row", async () => {
+  it("embeds an attendance pct (board-scoped) in every ranking row", async () => {
     const { statsService } = createServices(DB);
     const overall = await statsService.overallRanking();
     for (const r of overall.rows) {
@@ -363,6 +363,88 @@ describe("StatsService.overallRanking", () => {
       expect(r.attendance).toBeGreaterThanOrEqual(0);
       expect(r.attendance).toBeLessThanOrEqual(1);
     }
+  });
+
+  it("scopes ranking-row attendance to the activity filter", async () => {
+    const { eventService, statsService } = createServices(DB);
+    await seedMember("Rank_AttContribOnly");
+    await seedMember("Rank_AttBearOnly");
+
+    await eventService.create({
+      activity: "contribution",
+      date: "2029-09-03",
+      rows: [{ raw_name: "Rank_AttContribOnly", value: 60000 }],
+    });
+    await eventService.create({
+      activity: "bear_trap",
+      date: "2029-09-04",
+      rows: [{ raw_name: "Rank_AttBearOnly", value: 100 }],
+    });
+
+    const bearBoard = await statsService.overallRanking("bear_trap");
+    const contribOnly = bearBoard.rows.find((r) => r.governor === "Rank_AttContribOnly");
+    const bearOnly = bearBoard.rows.find((r) => r.governor === "Rank_AttBearOnly");
+
+    // The reported bug: a member with zero bear event-days showed their global attendance here.
+    expect(contribOnly?.attendance).toBe(0);
+    expect(bearOnly?.attendance).toBeGreaterThan(0);
+  });
+
+  it("scopes ranking-row attendance to the week on the weekly board", async () => {
+    const { eventService, statsService } = createServices(DB);
+    await seedMember("Rank_AttWeekly");
+    await seedMember("Rank_AttOtherWk");
+
+    const w1 = await eventService.create({
+      activity: "bear_trap",
+      date: "2028-06-05",
+      rows: [{ raw_name: "Rank_AttWeekly", value: 100 }],
+    });
+    const w2 = await eventService.create({
+      activity: "bear_trap",
+      date: "2028-06-12",
+      rows: [{ raw_name: "Rank_AttOtherWk", value: 100 }],
+    });
+
+    const attended = await statsService.weeklyRanking(w1.event.week);
+    expect(attended.rows.find((r) => r.governor === "Rank_AttWeekly")?.attendance).toBeGreaterThan(0);
+
+    const absent = await statsService.weeklyRanking(w2.event.week);
+    const stale = absent.rows.find((r) => r.governor === "Rank_AttWeekly");
+    expect(stale?.attendance).toBe(0);
+    // Movement still works — pins the invariant that the prior-week ranking reuses the target
+    // week's attendance map for rank movement only (attendance on prior rows is never read).
+    expect(typeof absent.rows.find((r) => r.governor === "Rank_AttOtherWk")?.movement).toBe("number");
+  });
+
+  it("scopes ranking-row attendance by week AND activity combined (the reported path)", async () => {
+    const { eventService, statsService } = createServices(DB);
+    await seedMember("Rank_AttComboMain");
+    await seedMember("Rank_AttComboOther");
+
+    // Week X: Main attends bear. Week W: Other attends bear; Main attends only contribution.
+    await eventService.create({
+      activity: "bear_trap",
+      date: "2029-11-05",
+      rows: [{ raw_name: "Rank_AttComboMain", value: 100 }],
+    });
+    const wW = await eventService.create({
+      activity: "bear_trap",
+      date: "2029-11-12",
+      rows: [{ raw_name: "Rank_AttComboOther", value: 100 }],
+    });
+    await eventService.create({
+      activity: "contribution",
+      date: "2029-11-12",
+      rows: [{ raw_name: "Rank_AttComboMain", value: 60000 }],
+    });
+
+    // Bear board for week W: Main attended bear in another week and contribution in W — both
+    // must be excluded. Both filters thread through ONE attendanceMap call; attendanceParams
+    // in stats-repo is bind-order-sensitive, so this is where a regression would hide.
+    const board = await statsService.weeklyRanking(wW.event.week, "bear_trap");
+    expect(board.rows.find((r) => r.governor === "Rank_AttComboMain")?.attendance).toBe(0);
+    expect(board.rows.find((r) => r.governor === "Rank_AttComboOther")?.attendance).toBeGreaterThan(0);
   });
 });
 
