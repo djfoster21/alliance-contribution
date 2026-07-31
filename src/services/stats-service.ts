@@ -115,23 +115,41 @@ export class StatsService {
   // desc, then governor asc. Both filters narrow numerator AND denominator together, so a scoped board
   // still reads 0–100%. A week/activity combination with no events gives total 0 -> every row 0%; callers
   // distinguish that from a genuine all-absent board via total_event_days.
+  // Weekly view also carries delta = pct(W) − pct(prior in-scope event-week); see AttendanceRow.delta.
   async attendance(week?: string, activityKey?: string): Promise<Attendance> {
     const total = await this.statsRepo.totalEventDays(week, activityKey);
     const counts = await this.statsRepo.attendanceCounts(week, activityKey);
+    // Rule 1: an empty target week must not emit -pct(prior) for the whole roster.
+    const prior = week && total ? await this.priorWeekAttendance(week, activityKey) : null;
 
     const rows: AttendanceRow[] = counts
-      .map((c) => ({
-        member_id: c.member_id,
-        governor: c.governor,
-        alliance_rank: c.alliance_rank,
-        attended: c.attended,
-        total,
-        pct: total ? c.attended / total : 0,
-        active: c.active,
-      }))
+      .map((c) => {
+        const pct = total ? c.attended / total : 0;
+        return {
+          member_id: c.member_id,
+          governor: c.governor,
+          alliance_rank: c.alliance_rank,
+          attended: c.attended,
+          total,
+          pct,
+          active: c.active,
+          // undefined keys are dropped by JSON serialization, so the all-time payload stays unchanged.
+          delta: week ? (prior ? pct - (prior.get(c.member_id) ?? 0) : null) : undefined,
+        };
+      })
       .sort((a, b) => b.pct - a.pct || compareGovernor(a.governor, b.governor));
 
     return { total_event_days: total, rows };
+  }
+
+  // Prior in-scope event-week's pct map, or null when none exists. Activity-aware via
+  // distinctEventWeeks so a week the activity skipped is skipped here too (mirrors weeklyRanking's
+  // prior-week rule).
+  private async priorWeekAttendance(week: string, activityKey?: string): Promise<Map<number, number> | null> {
+    const weeks = await this.statsRepo.distinctEventWeeks(activityKey);
+    const prior = [...weeks].reverse().find((w) => w < week) ?? null;
+    if (prior === null) return null;
+    return this.attendanceMap(prior, activityKey);
   }
 
   // member_id -> attendance pct (0..1) in the given scope. Same source as attendance(), reused to

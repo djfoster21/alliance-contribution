@@ -561,6 +561,84 @@ describe("StatsService.attendance", () => {
     expect(empty.rows.length).toBe(week1.rows.length);
     expect(empty.rows.every((r) => r.attended === 0 && r.pct === 0)).toBe(true);
   });
+
+  it("attaches delta vs the prior event-week on the weekly view", async () => {
+    const { eventService, statsService } = createServices(DB);
+    await seedMember("Dlt_Riser");
+    await seedMember("Dlt_Faller");
+
+    // Prior week: Faller attends, Riser doesn't. Target week: the reverse.
+    await eventService.create({
+      activity: "bear_trap",
+      date: "2030-01-07",
+      rows: [{ raw_name: "Dlt_Faller", value: 100 }],
+    });
+    const wW = await eventService.create({
+      activity: "bear_trap",
+      date: "2030-01-14",
+      rows: [{ raw_name: "Dlt_Riser", value: 100 }],
+    });
+
+    const att = await statsService.attendance(wW.event.week);
+    const riser = att.rows.find((r) => r.governor === "Dlt_Riser");
+    const faller = att.rows.find((r) => r.governor === "Dlt_Faller");
+    expect(riser?.delta).toBe(1); // 1/1 this week, 0/1 prior
+    expect(faller?.delta).toBe(-1); // 0/1 this week, 1/1 prior
+  });
+
+  it("delta is null on the earliest event-week (no prior) and absent on the all-time view", async () => {
+    const { statsService } = createServices(DB);
+    // weeks() returns newest-first; the last entry is the globally earliest event-week,
+    // whichever test seeded it — no prior week exists before it by definition.
+    const weeks = await statsService.weeks();
+    const earliest = weeks[weeks.length - 1];
+
+    const first = await statsService.attendance(earliest);
+    expect(first.rows.length).toBeGreaterThan(0);
+    expect(first.rows.every((r) => r.delta === null)).toBe(true);
+
+    const allTime = await statsService.attendance();
+    expect(allTime.rows.every((r) => !("delta" in r) || r.delta === undefined)).toBe(true);
+  });
+
+  it("delta is null for every row when the target week has no in-scope events", async () => {
+    const { statsService } = createServices(DB);
+    // A week no test seeds events into: rule 1 — total_event_days 0 must yield delta null,
+    // never -pct(prior) for the whole roster.
+    const empty = await statsService.attendance("2033-W07");
+    expect(empty.total_event_days).toBe(0);
+    expect(empty.rows.length).toBeGreaterThan(0);
+    expect(empty.rows.every((r) => r.delta === null)).toBe(true);
+  });
+
+  it("activity-filtered delta compares against the last week that HAD the activity", async () => {
+    const { eventService, statsService } = createServices(DB);
+    await seedMember("Dlt_SkipWk");
+    await seedMember("Dlt_SkipOther");
+
+    // Bear in week 1 (SkipWk attends), contribution-only week 2, bear again in week 3 (only
+    // SkipOther attends). Bear-scoped delta for week 3 must compare against week 1, not the
+    // bear-less week 2 (which would read as prior pct 0 and flatten SkipWk's drop to 0).
+    await eventService.create({
+      activity: "bear_trap",
+      date: "2030-03-04",
+      rows: [{ raw_name: "Dlt_SkipWk", value: 100 }],
+    });
+    await eventService.create({
+      activity: "contribution",
+      date: "2030-03-11",
+      rows: [{ raw_name: "Dlt_SkipWk", value: 60000 }],
+    });
+    const w3 = await eventService.create({
+      activity: "bear_trap",
+      date: "2030-03-18",
+      rows: [{ raw_name: "Dlt_SkipOther", value: 100 }],
+    });
+
+    const att = await statsService.attendance(w3.event.week, "bear_trap");
+    expect(att.rows.find((r) => r.governor === "Dlt_SkipWk")?.delta).toBe(-1); // 0/1 vs 1/1 in week 1
+    expect(att.rows.find((r) => r.governor === "Dlt_SkipOther")?.delta).toBe(1);
+  });
 });
 
 describe("StatsService freshness (no cache)", () => {

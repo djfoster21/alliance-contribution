@@ -131,6 +131,11 @@ export type AttendanceRow = {
   attended: number; // X
   total: number; // Y (same for every member = total distinct event-days)
   pct: number; // attended/total, 0..1 (0 when total is 0)
+  // Weekly view only (absent on all-time): pct(W) − pct(prior in-scope event-week). null when the
+  // target week has no in-scope event-days, or no prior in-scope event-week exists. Caveats
+  // (accepted, see 2026-07-31 spec): tiny denominators differ week to week, and members added
+  // after the prior week read a spurious full-positive delta.
+  delta?: number | null;
   active: number; // 0/1, mirrors Member.active — lets callers exclude soft-deleted members
 };
 export type Attendance = { total_event_days: number; rows: AttendanceRow[] };
