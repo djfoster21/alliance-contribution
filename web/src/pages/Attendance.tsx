@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import type { ActivityType, Attendance as AttendanceData } from "@shared/types";
 import { api } from "@/lib/api";
 import { useApi, firstError } from "@/lib/useApi";
 import { attendanceSummary } from "@/lib/overview-derive";
+import { cn } from "@/lib/utils";
 import { RankingScopeToggle, type RankingScope } from "@/components/RankingScopeToggle";
 import { RankByActivity } from "@/components/RankByActivity";
 import { Card } from "@/components/ui/card";
@@ -36,6 +38,27 @@ function thresholdColor(pctInt: number): string {
   if (pctInt >= 80) return "var(--color-up)";
   if (pctInt >= 50) return "var(--color-warn)";
   return "var(--color-down)";
+}
+
+/** Signed percentage-point change vs the prior event-week. Rendered only when the API sent the
+ *  field (weekly view). null / ±0pp both read as "no change" (em dash). */
+function DeltaPct({ delta }: { delta: number | null | undefined }) {
+  if (delta === undefined) return null;
+  const pp = delta === null ? 0 : Math.round(delta * 100);
+  if (pp === 0) return <span className="num ml-1.5 text-[11px] text-muted">—</span>;
+  const up = pp > 0;
+  return (
+    <span
+      className={cn(
+        "num ml-1.5 inline-flex items-center gap-0.5 text-[11px] font-semibold",
+        up ? "text-up" : "text-down",
+      )}
+      title="Change vs previous event week (percentage points)"
+    >
+      {up ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+      {Math.abs(pp)}pp
+    </span>
+  );
 }
 
 export function Attendance() {
@@ -219,6 +242,7 @@ export function Attendance() {
                       <span className="ml-1.5 text-muted">
                         {row.attended}/{row.total}
                       </span>
+                      <DeltaPct delta={row.delta} />
                     </TableCell>
                   </TableRow>
                 );
