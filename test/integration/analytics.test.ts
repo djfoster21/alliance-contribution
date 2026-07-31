@@ -578,12 +578,19 @@ describe("StatsService.attendance", () => {
       date: "2030-01-14",
       rows: [{ raw_name: "Dlt_Riser", value: 100 }],
     });
+    // Second bear event-day in the same target week (2030-W03), Faller only. Makes the target
+    // week's denominator 2 (not 1) so pct-based delta is distinguishable from raw-count delta.
+    await eventService.create({
+      activity: "bear_trap",
+      date: "2030-01-15",
+      rows: [{ raw_name: "Dlt_Faller", value: 100 }],
+    });
 
     const att = await statsService.attendance(wW.event.week);
     const riser = att.rows.find((r) => r.governor === "Dlt_Riser");
     const faller = att.rows.find((r) => r.governor === "Dlt_Faller");
-    expect(riser?.delta).toBe(1); // 1/1 this week, 0/1 prior
-    expect(faller?.delta).toBe(-1); // 0/1 this week, 1/1 prior
+    expect(riser?.delta).toBe(0.5); // 1/2 this week, 0/1 prior
+    expect(faller?.delta).toBe(-0.5); // 1/2 this week, 1/1 prior
   });
 
   it("delta is null on the earliest event-week (no prior) and absent on the all-time view", async () => {
