@@ -223,7 +223,7 @@ export class StatsService {
     }
     for (const s of scores) {
       const row = byMember.get(s.member_id);
-      if (!row) continue; // scored members always satisfy the EXISTS in rankedMembers
+      if (!row) continue; // drops scores of deactivated members (rankedMembers is active-only)
       row.score += s.points;
       row.breakdown[s.activity_key] = (row.breakdown[s.activity_key] ?? 0) + s.points;
     }

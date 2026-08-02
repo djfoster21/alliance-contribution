@@ -89,9 +89,7 @@ export function Attendance() {
   );
   const data = attendanceState.data;
   const rows = data?.rows ?? [];
-  // Roster-wide on purpose: this page lists every member, inactive included. The dashboard is the
-  // one that scopes to active (see activeRows in overview-derive.ts) — the omission here is the
-  // deliberate exception the helper's docblock allows for, not a missing filter.
+  // Server returns active members only (attendanceCounts filters on m.active = 1).
   const summary = attendanceSummary(rows);
   // Guards the zero-event case: with a populated roster and no events every member reads 0%, so the
   // tiles would announce the whole roster as at risk. Not derivable from rows.length.

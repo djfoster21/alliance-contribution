@@ -153,7 +153,7 @@ describe("StatsService.weeklyRanking", () => {
     expect(Array.isArray(ranking.rows)).toBe(true);
   });
 
-  it("includes active zero-point members, hides inactive zero-point members, keeps inactive scorers", async () => {
+  it("includes active zero-point members and hides all inactive members, scorers included", async () => {
     const { eventService, statsService } = createServices(DB);
     const scorerId = await seedMember("Zr_Scorer");
     await seedMember("Zr_ActiveZero");
@@ -178,7 +178,7 @@ describe("StatsService.weeklyRanking", () => {
 
     expect(governors).toContain("Zr_Scorer");
     expect(governors).toContain("Zr_ActiveZero"); // active, zero points -> included at 0
-    expect(governors).toContain("Zr_InactiveScored"); // inactive but ever-scored -> included
+    expect(governors).not.toContain("Zr_InactiveScored"); // inactive -> hidden even with points
     expect(governors).not.toContain("Zr_InactiveZero"); // inactive, never scored -> hidden
 
     const zero = ranking.rows.find((r) => r.governor === "Zr_ActiveZero");
@@ -484,11 +484,11 @@ describe("StatsService.attendance", () => {
     expect(a?.pct).toBeCloseTo(1 / attendance.total_event_days);
   });
 
-  it("carries each member's active flag, keeping deactivated members in the payload", async () => {
+  it("filters deactivated members out of the payload, keeps active no-shows at 0", async () => {
     const { eventService, memberService, statsService } = createServices(DB);
     const activeId = await seedMember("Att_ActiveMem");
     const inactiveId = await seedMember("Att_InactiveMem");
-    const noShowId = await seedMember("Att_NoShowMem");
+    await seedMember("Att_NoShowMem"); // active, never appears in any event -> attended === 0
 
     await eventService.create({
       activity: "bear_trap",
@@ -500,27 +500,22 @@ describe("StatsService.attendance", () => {
     });
 
     await memberService.deactivate(inactiveId);
-    await memberService.deactivate(noShowId); // never appears in any event -> attended === 0
 
     const attendance = await statsService.attendance();
     const active = attendance.rows.find((r) => r.governor === "Att_ActiveMem");
     const inactive = attendance.rows.find((r) => r.governor === "Att_InactiveMem");
     const noShow = attendance.rows.find((r) => r.governor === "Att_NoShowMem");
 
-    // Deliberate contract: the deactivated member is still present, not filtered out server-side.
+    // Deliberate contract: deactivated members are filtered out server-side, even with participations.
     expect(active).toBeDefined();
-    expect(inactive).toBeDefined();
     expect(active?.active).toBe(1);
-    expect(inactive?.active).toBe(0);
     expect(active?.member_id).toBe(activeId);
-    expect(inactive?.member_id).toBe(inactiveId);
+    expect(inactive).toBeUndefined();
 
-    // The row this feature exists to surface: an ex-member (active=0) who never showed up
-    // (attended=0). Relies on the LEFT JOIN in attendanceCounts() — an INNER JOIN would drop them.
+    // Active no-show still surfaces at attended=0. Relies on the LEFT JOIN in attendanceCounts() —
+    // an INNER JOIN would drop them.
     expect(noShow).toBeDefined();
-    expect(noShow?.active).toBe(0);
     expect(noShow?.attended).toBe(0);
-    expect(noShow?.member_id).toBe(noShowId);
   });
 
   it("scopes numerator and denominator together when filtered by week and by activity", async () => {

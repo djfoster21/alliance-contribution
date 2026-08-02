@@ -52,15 +52,14 @@ export class StatsRepo {
     );
   }
 
-  // In-set roster for the ranking boards: active members OR anyone who ever scored. Seeds the zero
-  // rows so boards are roster-wide instead of participants-only (zero-point inactive members hidden).
+  // In-set roster for the ranking boards: active members only. Seeds the zero rows so boards are
+  // roster-wide instead of participants-only; deactivated members are hidden even if they scored.
   async rankedMembers(): Promise<{ member_id: number; governor: string; alliance_rank: string | null }[]> {
     return all(
       this.db,
       `SELECT m.id AS member_id, m.governor, m.alliance_rank
        FROM members m
        WHERE m.active = 1
-          OR EXISTS (SELECT 1 FROM participations p WHERE p.member_id = m.id)
        ORDER BY m.governor`,
     );
   }
@@ -207,11 +206,12 @@ export class StatsRepo {
     return row?.count ?? 0;
   }
 
-  // Per member, the count of distinct event-days they appeared in. LEFT JOIN so no-shows appear with 0
-  // (COUNT(DISTINCT ...) over the NULL join key yields 0). A member in either trap of a two-trap day
-  // shares that day's (activity_type_id, date) key, so it counts once. The week/activity filters live in
-  // the join's ON clause, not a WHERE: in a WHERE they would drop every member whose only participations
-  // fall outside the filter, turning no-shows into missing rows instead of zeroes.
+  // Per member, the count of distinct event-days they appeared in. Active members only — deactivated
+  // members are hidden from attendance. LEFT JOIN so no-shows appear with 0 (COUNT(DISTINCT ...) over
+  // the NULL join key yields 0). A member in either trap of a two-trap day shares that day's
+  // (activity_type_id, date) key, so it counts once. The week/activity filters live in the join's ON
+  // clause, not the WHERE: in the WHERE they would drop every member whose only participations fall
+  // outside the filter, turning no-shows into missing rows instead of zeroes.
   async attendanceCounts(
     week?: string,
     activityKey?: string,
@@ -227,6 +227,7 @@ export class StatsRepo {
        LEFT JOIN events e ON e.id = p.event_id
          ${week ? "AND e.week = ?" : ""}
          ${activityKey ? "AND e.activity_type_id = (SELECT id FROM activity_types WHERE key = ?)" : ""}
+       WHERE m.active = 1
        GROUP BY m.id`,
       ...attendanceParams(week, activityKey),
     );
