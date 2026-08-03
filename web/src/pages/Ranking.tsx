@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type {
-  ActivityType,
-  OverallRanking as OverallRankingData,
-  WeeklyRanking as WeeklyRankingData,
-  WeeklyRankingRow,
+import {
+  DEFAULT_RANK_BANDS,
+  type ActivityType,
+  type OverallRanking as OverallRankingData,
+  type RankBands,
+  type WeeklyRanking as WeeklyRankingData,
+  type WeeklyRankingRow,
 } from "@shared/types";
 import { api } from "@/lib/api";
+import { assignBands, BAND_EDGE_CLASS, BAND_ROW_CLASS } from "@/lib/alliance-rank";
+import { BandLegend } from "@/components/BandLegend";
+import { cn } from "@/lib/utils";
 import { useApi, firstError } from "@/lib/useApi";
 import { RankingScopeToggle, type RankingScope } from "@/components/RankingScopeToggle";
 import { RankByActivity } from "@/components/RankByActivity";
@@ -62,6 +67,9 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
     [scope, week, activity],
   );
 
+  const bandsState = useApi<RankBands>(() => api.settings.rankBands(), []);
+  const bandsCfg = bandsState.data ?? DEFAULT_RANK_BANDS;
+
   const activities = useMemo(
     () => (activitiesState.data ?? []).slice().sort((a, b) => a.sort - b.sort),
     [activitiesState.data],
@@ -71,6 +79,10 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
   // Overall rows lack `movement`; safe to widen because every `row.movement` read is gated behind
   // `weekly` (the Move column and PodiumCard's `showMovement={weekly}`), so it never runs on the overall board.
   const rows = (rankingState.data?.rows ?? []) as WeeklyRankingRow[];
+  const bands = useMemo(
+    () => assignBands(rows.map((r) => ({ alliance_rank: r.alliance_rank, value: r.score })), bandsCfg),
+    [rows, bandsCfg],
+  );
   const possible = rankingState.data?.possible ?? 0;
   const scoreLabel = weekly ? "This-Week Score" : "Season Score";
   const activityLabel =
@@ -139,6 +151,8 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
             </div>
           )}
 
+          <BandLegend bands={bandsCfg} />
+
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-[18px] py-[15px]">
               <div>
@@ -163,11 +177,11 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => {
+                {rows.map((row, i) => {
                   const medal = MEDALS[row.rank];
                   return (
-                    <TableRow key={row.member_id} className="cursor-pointer">
-                      <TableCell>
+                    <TableRow key={row.member_id} className={cn("cursor-pointer", BAND_ROW_CLASS[bands[i]])}>
+                      <TableCell className={BAND_EDGE_CLASS[bands[i]]}>
                         <Link to={`/members/${row.member_id}`} className="block">
                           <Badge
                             className="num h-6 min-w-[26px] justify-center rounded-[6px] border-0 px-1.5 text-[13px] font-bold"

@@ -58,3 +58,23 @@ export function assignBands(
   }
   return out;
 }
+
+/** Faint row tint per band. */
+export const BAND_ROW_CLASS: Record<Band, string> = {
+  leadership: "bg-band-lead-bg",
+  top: "bg-band-top-bg",
+  mid: "bg-band-mid-bg",
+  rest: "bg-band-rest-bg",
+};
+
+/**
+ * Band edge for the row's FIRST CELL, not the row: `Table` is border-collapse: collapse, and
+ * browsers don't paint box-shadow on row boxes in the collapse model (same trick as
+ * roster-cells.tsx riskEdgeClass).
+ */
+export const BAND_EDGE_CLASS: Record<Band, string> = {
+  leadership: "[box-shadow:inset_3px_0_0_var(--color-band-lead)]",
+  top: "[box-shadow:inset_3px_0_0_var(--color-band-top)]",
+  mid: "[box-shadow:inset_3px_0_0_var(--color-band-mid)]",
+  rest: "[box-shadow:inset_3px_0_0_var(--color-band-rest)]",
+};
