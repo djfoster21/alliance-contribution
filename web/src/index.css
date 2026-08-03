@@ -2,9 +2,9 @@
 
 /*
   Alliance Tracker — design system.
-  Zinc neutrals, monochrome black accent, medals + traffic-light status as the only
-  color pops. Geist / Geist Mono. Hairline borders + soft card shadows. Numbers are
-  DATA: tabular-nums + monospace.
+  Zinc neutrals, monochrome black accent; medals, traffic-light status, and the rank-band
+  hues (blue/teal/slate/purple, 2026-08-03 spec) are the colour pops. Geist / Geist Mono.
+  Hairline borders + soft card shadows. Numbers are DATA: tabular-nums + monospace.
 */
 @theme {
   /* Neutrals (zinc) */
@@ -58,6 +58,30 @@
   --color-flag-border: #fde68a;
   --color-flag-fg: #92400e;
   --color-flag-accent: #b45309;
+
+  /* Rank bands (2026-08-03 spec): edge + faint row tint on the two boards. Hue families are
+     new on purpose — traffic-light status and medals keep their meanings. */
+  --color-band-lead: #9333ea;
+  --color-band-lead-bg: #faf5ff;
+  --color-band-top: #2563eb;
+  --color-band-top-bg: #eff6ff;
+  --color-band-mid: #0d9488;
+  --color-band-mid-bg: #f0fdfa;
+  --color-band-rest: #94a3b8;
+  --color-band-rest-bg: #f8fafc;
+
+  /* R1–R5 badge tones — hues echo the bands (R3=top, R2=mid, R1=rest, R4/R5=leadership;
+     R5 is the bold variant, weight carries R4-vs-R5). */
+  --color-rank5-bg: #9333ea;
+  --color-rank5-fg: #ffffff;
+  --color-rank4-bg: #f3e8ff;
+  --color-rank4-fg: #7e22ce;
+  --color-rank3-bg: #dbeafe;
+  --color-rank3-fg: #1d4ed8;
+  --color-rank2-bg: #ccfbf1;
+  --color-rank2-fg: #0f766e;
+  --color-rank1-bg: #f1f5f9;
+  --color-rank1-fg: #475569;
 
   /* Activity-type badges (event log) */
   --color-badge-blue-bg: #eff6ff;
@@ -148,6 +172,30 @@
   --color-flag-border: #713f12;
   --color-flag-fg: #fde68a;
   --color-flag-accent: #fbbf24;
+
+  /* Rank bands (2026-08-03 spec): edge + faint row tint on the two boards. Hue families are
+     new on purpose — traffic-light status and medals keep their meanings. */
+  --color-band-lead: #c084fc;
+  --color-band-lead-bg: #2a1d3a;
+  --color-band-top: #60a5fa;
+  --color-band-top-bg: #172136;
+  --color-band-mid: #2dd4bf;
+  --color-band-mid-bg: #122b28;
+  --color-band-rest: #64748b;
+  --color-band-rest-bg: #1c2230;
+
+  /* R1–R5 badge tones — hues echo the bands (R3=top, R2=mid, R1=rest, R4/R5=leadership;
+     R5 is the bold variant, weight carries R4-vs-R5). */
+  --color-rank5-bg: #7e22ce;
+  --color-rank5-fg: #f3e8ff;
+  --color-rank4-bg: #3b2a52;
+  --color-rank4-fg: #d8b4fe;
+  --color-rank3-bg: #1e3a5f;
+  --color-rank3-fg: #93c5fd;
+  --color-rank2-bg: #113b37;
+  --color-rank2-fg: #5eead4;
+  --color-rank1-bg: #334155;
+  --color-rank1-fg: #cbd5e1;
 
   /* Activity-type badges — dark tints, bright text */
   --color-badge-blue-bg: #172554;
