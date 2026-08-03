@@ -26,12 +26,19 @@ export function RankBandsCard() {
   const current = state.data ?? DEFAULT_RANK_BANDS;
   const topVal = top ?? String(current.top);
   const midVal = mid ?? String(current.mid);
-  const topNum = Number(topVal);
-  const midNum = Number(midVal);
-  const valid =
-    Number.isInteger(topNum) && topNum >= 0 && Number.isInteger(midNum) && midNum >= 0;
+  /** Blank or non-numeric → null (invalid), mirroring Scoring's toNumber convention. */
+  const toBandSize = (raw: string): number | null => {
+    const trimmed = raw.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  };
+  const topNum = toBandSize(topVal);
+  const midNum = toBandSize(midVal);
+  const valid = topNum !== null && midNum !== null;
 
   const save = async () => {
+    if (topNum === null || midNum === null) return;
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -63,7 +70,7 @@ export function RankBandsCard() {
             value={topVal}
             onChange={(e) => setTop(e.target.value)}
             disabled={!admin}
-            aria-invalid={!valid}
+            aria-invalid={topNum === null}
           />
         </label>
         <label className="flex flex-col gap-1 text-[12px] text-muted">
@@ -74,7 +81,7 @@ export function RankBandsCard() {
             value={midVal}
             onChange={(e) => setMid(e.target.value)}
             disabled={!admin}
-            aria-invalid={!valid}
+            aria-invalid={midNum === null}
           />
         </label>
         {admin && (
