@@ -68,8 +68,11 @@ export function RankBandsCard() {
             className="w-24"
             inputMode="numeric"
             value={topVal}
-            onChange={(e) => setTop(e.target.value)}
-            disabled={!admin}
+            onChange={(e) => {
+              setTop(e.target.value);
+              setSaved(false);
+            }}
+            readOnly={!admin}
             aria-invalid={topNum === null}
           />
         </label>
@@ -79,17 +82,21 @@ export function RankBandsCard() {
             className="w-24"
             inputMode="numeric"
             value={midVal}
-            onChange={(e) => setMid(e.target.value)}
-            disabled={!admin}
+            onChange={(e) => {
+              setMid(e.target.value);
+              setSaved(false);
+            }}
+            readOnly={!admin}
             aria-invalid={midNum === null}
           />
         </label>
         {admin && (
-          <Button size="sm" onClick={save} disabled={!valid || saving}>
+          <Button size="sm" onClick={save} disabled={!valid || saving || state.data === null}>
             {saving ? "Saving…" : "Save"}
           </Button>
         )}
       </div>
+      {state.error && <p className="text-[12px] text-down">{state.error}</p>}
       {!valid && <p className="text-[12px] text-down">Sizes must be whole numbers ≥ 0.</p>}
       {error && <p className="text-[12px] text-down">{error}</p>}
       {saved && <p className="text-[12px] text-up">Saved.</p>}
