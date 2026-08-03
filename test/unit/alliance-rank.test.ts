@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignBands, BAND_EXPECTED_RANK, rankMismatch, rankTone } from "../../web/src/lib/alliance-rank";
+import { assignBands, BAND_EXPECTED_RANK, mismatchDirection, rankMismatch, rankTone } from "../../web/src/lib/alliance-rank";
 
 describe("rankTone", () => {
   it("returns null for an unrecorded rank so callers render nothing", () => {
@@ -88,5 +88,22 @@ describe("rankMismatch", () => {
 
   it("does not flag when the section has no expected rank (leadership)", () => {
     expect(rankMismatch("R5", null)).toBe(false);
+  });
+});
+
+describe("mismatchDirection", () => {
+  it("points up when the member outranks their badge (promotion candidate)", () => {
+    expect(mismatchDirection("R2", "R3")).toBe("up");
+    expect(mismatchDirection("R1", "R2")).toBe("up");
+  });
+
+  it("points down when the badge outranks the section (demotion candidate)", () => {
+    expect(mismatchDirection("R3", "R1")).toBe("down");
+  });
+
+  it("is null when matched, unknown, or leadership section", () => {
+    expect(mismatchDirection("R3", "R3")).toBeNull();
+    expect(mismatchDirection(null, "R3")).toBeNull();
+    expect(mismatchDirection("R5", null)).toBeNull();
   });
 });

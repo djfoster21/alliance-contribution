@@ -1,5 +1,6 @@
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { rankMismatch, rankTone } from "@/lib/alliance-rank";
+import { mismatchDirection, rankTone } from "@/lib/alliance-rank";
 
 /**
  * The R1–R5 alliance-rank pill. Renders NOTHING when the member has no recorded rank — an absent
@@ -23,22 +24,24 @@ export function AllianceRankBadge({
 }) {
   const tone = rankTone(rank);
   if (!tone) return null;
-  const mismatch = rankMismatch(rank, expected ?? null);
+  const direction = mismatchDirection(rank, expected ?? null);
+  const title = direction
+    ? `Alliance rank ${rank} — this section is for ${expected}s`
+    : `Alliance rank ${rank}`;
   return (
-    <span
-      title={
-        mismatch
-          ? `Alliance rank ${rank} — this section is for ${expected}s`
-          : `Alliance rank ${rank}`
-      }
-      className={cn(
-        "num inline-flex items-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-semibold",
-        tone,
-        mismatch && "ring-2 ring-warn",
-        className,
-      )}
-    >
-      {rank}
+    <span title={title} className="inline-flex items-center gap-1">
+      <span
+        className={cn(
+          "num inline-flex items-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-semibold",
+          tone,
+          direction && "ring-2 ring-warn",
+          className,
+        )}
+      >
+        {rank}
+      </span>
+      {direction === "up" && <ArrowUp className="size-3.5 text-up" />}
+      {direction === "down" && <ArrowDown className="size-3.5 text-down" />}
     </span>
   );
 }

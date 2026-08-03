@@ -75,6 +75,16 @@ export function rankMismatch(rank: string | null, expected: string | null): bool
   return rank !== null && expected !== null && rank !== expected;
 }
 
+/**
+ * Which way a mismatched member should move: "up" when their section outranks their badge
+ * (promotion candidate), "down" when the badge outranks the section. Null when there is
+ * nothing to say (matched, unknown rank, or leadership section).
+ */
+export function mismatchDirection(rank: string | null, expected: string | null): "up" | "down" | null {
+  if (!rankMismatch(rank, expected)) return null;
+  return Number(expected!.slice(1)) > Number(rank!.slice(1)) ? "up" : "down";
+}
+
 /** Faint row tint per band. */
 export const BAND_ROW_CLASS: Record<Band, string> = {
   leadership: "bg-band-lead-bg",
