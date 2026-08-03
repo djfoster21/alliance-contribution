@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { activityBadgeClass } from "@/lib/activity";
 import { ColorSwatchPicker } from "@/components/ColorSwatchPicker";
 import { EditBandsDialog } from "@/components/scoring/EditBandsDialog";
+import { RankBandsCard } from "@/components/scoring/RankBandsCard";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -696,6 +697,8 @@ export function Scoring() {
           ))}
         </div>
       )}
+
+      <RankBandsCard />
 
       <AddActivityDialog
         open={addOpen}
