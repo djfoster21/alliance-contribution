@@ -59,6 +59,22 @@ export function assignBands(
   return out;
 }
 
+/**
+ * The should-be rank per section: the top band is where R3s belong, the second R2s, the rest R1s.
+ * Leadership is appointed, not positional — no expectation.
+ */
+export const BAND_EXPECTED_RANK: Record<Band, string | null> = {
+  leadership: null,
+  top: "R3",
+  mid: "R2",
+  rest: "R1",
+};
+
+/** True when a member's recorded rank sits outside its section's should-be rank. */
+export function rankMismatch(rank: string | null, expected: string | null): boolean {
+  return rank !== null && expected !== null && rank !== expected;
+}
+
 /** Faint row tint per band. */
 export const BAND_ROW_CLASS: Record<Band, string> = {
   leadership: "bg-band-lead-bg",

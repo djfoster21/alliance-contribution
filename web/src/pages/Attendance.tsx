@@ -6,12 +6,13 @@ import type { ActivityType, Attendance as AttendanceData } from "@shared/types";
 import { api } from "@/lib/api";
 import { useApi, firstError } from "@/lib/useApi";
 import { attendanceSummary } from "@/lib/overview-derive";
-import { assignBands, BAND_EDGE_CLASS, BAND_ROW_CLASS } from "@/lib/alliance-rank";
+import { assignBands, BAND_EDGE_CLASS, BAND_EXPECTED_RANK, BAND_ROW_CLASS } from "@/lib/alliance-rank";
 import { BandLegend } from "@/components/BandLegend";
 import { cn } from "@/lib/utils";
 import { RankingScopeToggle, type RankingScope } from "@/components/RankingScopeToggle";
 import { RankByActivity } from "@/components/RankByActivity";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -68,6 +69,7 @@ export function Attendance() {
   const [scope, setScope] = useState<RankingScope>("overall");
   const [week, setWeek] = useState<string | null>(null);
   const [activity, setActivity] = useState("all"); // "all" | activity.key
+  const [hideLeadership, setHideLeadership] = useState(false);
 
   const weeksState = useApi(() => api.weeks(), []);
   const activitiesState = useApi<ActivityType[]>(() => api.activityTypes.list({ active: true }), []);
@@ -102,8 +104,18 @@ export function Attendance() {
     () => assignBands(rows.map((r) => ({ alliance_rank: r.alliance_rank, value: r.attended })), bandsCfg),
     [rows, bandsCfg],
   );
-  // Server returns active members only (attendanceCounts filters on m.active = 1).
-  const summary = attendanceSummary(rows);
+  // Bands are assigned on the FULL list first — hiding R4/R5 must not shift who counts as top-N
+  // (it can't anyway, leadership is uncounted, but pairing row+band before filtering keeps it that way).
+  const visible = useMemo(
+    () =>
+      rows
+        .map((row, i) => ({ row, band: bands[i] }))
+        .filter((p) => !hideLeadership || p.band !== "leadership"),
+    [rows, bands, hideLeadership],
+  );
+  // Server returns active members only (attendanceCounts filters on m.active = 1). Tiles follow the
+  // toggle: with R4/R5 hidden they describe the members the boards are judging.
+  const summary = attendanceSummary(visible.map((p) => p.row));
   // Guards the zero-event case: with a populated roster and no events every member reads 0%, so the
   // tiles would announce the whole roster as at risk. Not derivable from rows.length.
   const hasEvents = (data?.total_event_days ?? 0) > 0;
@@ -134,6 +146,10 @@ export function Attendance() {
             Season · all weeks combined
           </span>
         )}
+        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-secondary">
+          <Checkbox checked={hideLeadership} onCheckedChange={(v) => setHideLeadership(v === true)} />
+          Hide R4/R5
+        </label>
       </div>
 
       <div>
@@ -222,12 +238,12 @@ export function Attendance() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row, i) => {
+              {visible.map(({ row, band }) => {
                 const pctInt = row.total > 0 ? Math.round(row.pct * 100) : 0;
                 const color = thresholdColor(pctInt);
                 return (
-                  <TableRow key={row.member_id} className={BAND_ROW_CLASS[bands[i]]}>
-                    <TableCell className={BAND_EDGE_CLASS[bands[i]]}>
+                  <TableRow key={row.member_id} className={BAND_ROW_CLASS[band]}>
+                    <TableCell className={BAND_EDGE_CLASS[band]}>
                       <div className="flex items-center gap-2.5">
                         <Avatar name={row.governor} size={24} />
                         <Link
@@ -239,7 +255,7 @@ export function Attendance() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <AllianceRankBadge rank={row.alliance_rank} />
+                      <AllianceRankBadge rank={row.alliance_rank} expected={BAND_EXPECTED_RANK[band]} />
                     </TableCell>
                     <TableCell>
                       <Progress

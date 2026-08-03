@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignBands, rankTone } from "../../web/src/lib/alliance-rank";
+import { assignBands, BAND_EXPECTED_RANK, rankMismatch, rankTone } from "../../web/src/lib/alliance-rank";
 
 describe("rankTone", () => {
   it("returns null for an unrecorded rank so callers render nothing", () => {
@@ -60,5 +60,33 @@ describe("assignBands", () => {
 
   it("keeps a tie group intact across an interrupting leadership row", () => {
     expect(assignBands([m(7), m(7, "R4"), m(7)], { top: 1, mid: 1 })).toEqual(["top", "leadership", "top"]);
+  });
+});
+
+describe("BAND_EXPECTED_RANK", () => {
+  it("maps each counted section to its should-be rank, leadership to none", () => {
+    expect(BAND_EXPECTED_RANK.top).toBe("R3");
+    expect(BAND_EXPECTED_RANK.mid).toBe("R2");
+    expect(BAND_EXPECTED_RANK.rest).toBe("R1");
+    expect(BAND_EXPECTED_RANK.leadership).toBeNull();
+  });
+});
+
+describe("rankMismatch", () => {
+  it("flags a rank sitting outside its section", () => {
+    expect(rankMismatch("R2", "R3")).toBe(true);
+    expect(rankMismatch("R3", "R1")).toBe(true);
+  });
+
+  it("does not flag a matching rank", () => {
+    expect(rankMismatch("R3", "R3")).toBe(false);
+  });
+
+  it("does not flag when the rank is unknown — nothing to compare", () => {
+    expect(rankMismatch(null, "R3")).toBe(false);
+  });
+
+  it("does not flag when the section has no expected rank (leadership)", () => {
+    expect(rankMismatch("R5", null)).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import {
   type WeeklyRankingRow,
 } from "@shared/types";
 import { api } from "@/lib/api";
-import { assignBands, BAND_EDGE_CLASS, BAND_ROW_CLASS } from "@/lib/alliance-rank";
+import { assignBands, BAND_EDGE_CLASS, BAND_EXPECTED_RANK, BAND_ROW_CLASS } from "@/lib/alliance-rank";
 import { BandLegend } from "@/components/BandLegend";
 import { cn } from "@/lib/utils";
 import { useApi, firstError } from "@/lib/useApi";
@@ -20,6 +20,7 @@ import { AllianceRankBadge } from "@/components/AllianceRankBadge";
 import { MEDALS, Movement, PodiumCard, ScoreCell } from "@/components/ranking-parts";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar } from "@/components/ui/avatar";
 import {
   Select,
@@ -46,6 +47,7 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
   const [scope, setScope] = useState<RankingScope>(initialScope);
   const [week, setWeek] = useState<string | null>(null);
   const [activity, setActivity] = useState("all"); // "all" | activity.key
+  const [hideLeadership, setHideLeadership] = useState(false);
 
   const weeksState = useApi(() => api.weeks(), []);
   const activitiesState = useApi<ActivityType[]>(() => api.activityTypes.list({ active: true }), []);
@@ -85,6 +87,15 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
     () => assignBands(rows.map((r) => ({ alliance_rank: r.alliance_rank, value: r.score })), bandsCfg),
     [rows, bandsCfg],
   );
+  // Bands are assigned on the FULL list first — hiding R4/R5 must not shift who counts as top-N
+  // (it can't anyway, leadership is uncounted, but pairing row+band before filtering keeps it that way).
+  const visible = useMemo(
+    () =>
+      rows
+        .map((row, i) => ({ row, band: bands[i] }))
+        .filter((p) => !hideLeadership || p.band !== "leadership"),
+    [rows, bands, hideLeadership],
+  );
   const possible = rankingState.data?.possible ?? 0;
   const scoreLabel = weekly ? "This-Week Score" : "Season Score";
   const activityLabel =
@@ -96,7 +107,7 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
   const noEvents = weekly && (rankingState.data as WeeklyRankingData | null)?.hasEvents === false;
 
   // Top-5 podium only when at least 5 members have scored; otherwise table-only.
-  const top5 = rows.slice(0, 5);
+  const top5 = visible.slice(0, 5).map((p) => p.row);
   const showPodium = top5.length === 5 && top5.every((r) => r.score > 0);
 
   const error = firstError(weeksState, activitiesState, rankingState);
@@ -124,6 +135,10 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
             Season · all weeks combined
           </span>
         )}
+        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-secondary">
+          <Checkbox checked={hideLeadership} onCheckedChange={(v) => setHideLeadership(v === true)} />
+          Hide R4/R5
+        </label>
         <span className="text-[12.5px] text-muted">{weekly ? "Movement vs previous week" : ""}</span>
       </div>
 
@@ -160,7 +175,7 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
               <div>
                 <div className="text-[14px] font-semibold">Full Standings</div>
                 <div className="text-[12px] text-muted">
-                  <span className="num">{rows.length}</span> members · {weekly ? "this week" : "overall"} · sorted by rank
+                  <span className="num">{visible.length}</span> members · {weekly ? "this week" : "overall"} · sorted by rank
                 </div>
               </div>
               <Badge variant="neutral">Click any row → profile</Badge>
@@ -179,11 +194,11 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row, i) => {
+                {visible.map(({ row, band }) => {
                   const medal = MEDALS[row.rank];
                   return (
-                    <TableRow key={row.member_id} className={cn("cursor-pointer", BAND_ROW_CLASS[bands[i]])}>
-                      <TableCell className={BAND_EDGE_CLASS[bands[i]]}>
+                    <TableRow key={row.member_id} className={cn("cursor-pointer", BAND_ROW_CLASS[band])}>
+                      <TableCell className={BAND_EDGE_CLASS[band]}>
                         <Link to={`/members/${row.member_id}`} className="block">
                           <Badge
                             className="num h-6 min-w-[26px] justify-center rounded-[6px] border-0 px-1.5 text-[13px] font-bold"
@@ -203,7 +218,7 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <AllianceRankBadge rank={row.alliance_rank} />
+                        <AllianceRankBadge rank={row.alliance_rank} expected={BAND_EXPECTED_RANK[band]} />
                       </TableCell>
                       <TableCell>
                         <ScoreCell score={row.score} possible={possible} barColor={medal?.bar} />
