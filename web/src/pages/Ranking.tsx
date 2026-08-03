@@ -67,6 +67,8 @@ export function Ranking({ initialScope = "overall" }: { initialScope?: RankingSc
     [scope, week, activity],
   );
 
+  // Deliberately outside firstError/busy: bands are cosmetic, so a slow or failed settings
+  // fetch falls back to DEFAULT_RANK_BANDS rather than blocking the board.
   const bandsState = useApi<RankBands>(() => api.settings.rankBands(), []);
   const bandsCfg = bandsState.data ?? DEFAULT_RANK_BANDS;
 

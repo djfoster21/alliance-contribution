@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { DEFAULT_RANK_BANDS, type RankBands } from "@shared/types";
 import type { ActivityType, Attendance as AttendanceData } from "@shared/types";
 import { api } from "@/lib/api";
 import { useApi, firstError } from "@/lib/useApi";
 import { attendanceSummary } from "@/lib/overview-derive";
+import { assignBands, BAND_EDGE_CLASS, BAND_ROW_CLASS } from "@/lib/alliance-rank";
+import { BandLegend } from "@/components/BandLegend";
 import { cn } from "@/lib/utils";
 import { RankingScopeToggle, type RankingScope } from "@/components/RankingScopeToggle";
 import { RankByActivity } from "@/components/RankByActivity";
@@ -87,8 +90,18 @@ export function Attendance() {
     () => (weekly && !week ? Promise.resolve(NO_SCOPE) : api.attendance(weekly ? week! : undefined, activityParam)),
     [scope, week, activity],
   );
+  // Deliberately outside firstError/busy: bands are cosmetic, so a slow or failed settings
+  // fetch falls back to DEFAULT_RANK_BANDS rather than blocking the board.
+  const bandsState = useApi<RankBands>(() => api.settings.rankBands(), []);
+  const bandsCfg = bandsState.data ?? DEFAULT_RANK_BANDS;
   const data = attendanceState.data;
   const rows = data?.rows ?? [];
+  // value = attended count: `total` is one scalar for the whole board, so attended orders and
+  // ties identically to the pct the server sorts by.
+  const bands = useMemo(
+    () => assignBands(rows.map((r) => ({ alliance_rank: r.alliance_rank, value: r.attended })), bandsCfg),
+    [rows, bandsCfg],
+  );
   // Server returns active members only (attendanceCounts filters on m.active = 1).
   const summary = attendanceSummary(rows);
   // Guards the zero-event case: with a populated roster and no events every member reads 0%, so the
@@ -168,20 +181,23 @@ export function Attendance() {
       {/* Tied to the same pair as the tiles above, not just hasRoster — filtering can leave a
           populated roster with zero events in scope, and the table renders an empty state then too. */}
       {hasEvents && hasRoster && (
-        <div className="flex flex-wrap items-center justify-end gap-4 text-[12px] text-muted">
-          <span className="flex items-center gap-1.5">
-            <span className="size-3.5 rounded border border-good-border bg-good-bg" />
-            ≥80% Good
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-3.5 rounded border border-watch-border bg-watch-bg" />
-            50–79% Watch
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-3.5 rounded border border-risk-border bg-risk-bg" />
-            &lt;50% At risk
-          </span>
-        </div>
+        <>
+          <div className="flex flex-wrap items-center justify-end gap-4 text-[12px] text-muted">
+            <span className="flex items-center gap-1.5">
+              <span className="size-3.5 rounded border border-good-border bg-good-bg" />
+              ≥80% Good
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-3.5 rounded border border-watch-border bg-watch-bg" />
+              50–79% Watch
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-3.5 rounded border border-risk-border bg-risk-bg" />
+              &lt;50% At risk
+            </span>
+          </div>
+          <BandLegend bands={bandsCfg} />
+        </>
       )}
 
       <Card className="overflow-hidden">
@@ -206,12 +222,12 @@ export function Attendance() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => {
+              {rows.map((row, i) => {
                 const pctInt = row.total > 0 ? Math.round(row.pct * 100) : 0;
                 const color = thresholdColor(pctInt);
                 return (
-                  <TableRow key={row.member_id}>
-                    <TableCell>
+                  <TableRow key={row.member_id} className={BAND_ROW_CLASS[bands[i]]}>
+                    <TableCell className={BAND_EDGE_CLASS[bands[i]]}>
                       <div className="flex items-center gap-2.5">
                         <Avatar name={row.governor} size={24} />
                         <Link
