@@ -61,4 +61,8 @@ describe("assignBands", () => {
   it("pushes everyone to rest with zero-size bands", () => {
     expect(assignBands([m(9), m(8)], { top: 0, mid: 0 })).toEqual(["rest", "rest"]);
   });
+
+  it("keeps a tie group intact across an interrupting leadership row", () => {
+    expect(assignBands([m(7), m(7, "R4"), m(7)], { top: 1, mid: 1 })).toEqual(["top", "leadership", "top"]);
+  });
 });
