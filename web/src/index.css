@@ -67,7 +67,7 @@
   --color-band-top-bg: #eff6ff;
   --color-band-mid: #0d9488;
   --color-band-mid-bg: #f0fdfa;
-  --color-band-rest: #94a3b8;
+  --color-band-rest: #64748b;
   --color-band-rest-bg: #f8fafc;
 
   /* R1–R5 badge tones — hues echo the bands (R3=top, R2=mid, R1=rest, R4/R5=leadership;
@@ -80,8 +80,8 @@
   --color-rank3-fg: #1d4ed8;
   --color-rank2-bg: #ccfbf1;
   --color-rank2-fg: #0f766e;
-  --color-rank1-bg: #f1f5f9;
-  --color-rank1-fg: #475569;
+  --color-rank1-bg: #f4f4f5;
+  --color-rank1-fg: #52525b;
 
   /* Activity-type badges (event log) */
   --color-badge-blue-bg: #eff6ff;
