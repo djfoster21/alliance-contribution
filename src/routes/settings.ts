@@ -13,9 +13,9 @@ settingsRoutes.get("/rank-bands", async (c) => {
 
 // Admin-gated by explicit user choice (stricter than the manager-editable scoring config).
 settingsRoutes.put("/rank-bands", requireAdmin, async (c) => {
-  const body = await c.req.json<{ top?: unknown; mid?: unknown }>();
   const { settingsService } = createServices(c.env.DB);
   try {
+    const body = await c.req.json<{ top?: unknown; mid?: unknown }>();
     return c.json(await settingsService.setRankBands(body));
   } catch (err) {
     return c.json({ error: (err as Error).message }, 400);
