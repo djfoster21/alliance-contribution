@@ -5,6 +5,7 @@ import { EventRepo } from "../repositories/event-repo";
 import { MemberRepo } from "../repositories/member-repo";
 import { ParticipationRepo } from "../repositories/participation-repo";
 import { ScoringTierRepo } from "../repositories/scoring-tier-repo";
+import { SettingsRepo } from "../repositories/settings-repo";
 import { SnapshotRepo } from "../repositories/snapshot-repo";
 import { StatsRepo } from "../repositories/stats-repo";
 import { ActivityService } from "./activity-service";
@@ -15,6 +16,7 @@ import { MemberService } from "./member-service";
 import { RecomputeService } from "./recompute-service";
 import { ResolveService } from "./resolve-service";
 import { ScoringService } from "./scoring-service";
+import { SettingsService } from "./settings-service";
 import { StatsService } from "./stats-service";
 
 // Composition root: wires repositories and services in dependency order.
@@ -49,6 +51,7 @@ export function createServices(db: D1Database) {
     resolveService,
     recomputeService,
     statsService: new StatsService(statsRepo),
+    settingsService: new SettingsService(new SettingsRepo(db)),
     backupService: new BackupService(backupRepo, recomputeService),
   };
 }

@@ -1,6 +1,7 @@
 // Pure backup domain: table metadata + envelope builder + validator. No DB access.
-// SCHEMA_VERSION is the latest applied migration id; bump it whenever a migration is added so a
-// dump taken under a different schema is rejected before any destructive import step.
+// SCHEMA_VERSION is the latest migration that shapes the BACKED-UP tables; bump it when such a
+// migration lands so a dump taken under a different schema is rejected before any destructive
+// import step. Migrations that only touch BACKUP_EXCLUDED_TABLES do not move it.
 export const SCHEMA_VERSION = "0004";
 export const BACKUP_FORMAT = "alliance-backup";
 export const BACKUP_VERSION = 1;
@@ -13,6 +14,11 @@ export type TableName =
   | "member_snapshots"
   | "events"
   | "participations";
+
+/** Tables deliberately NOT in the backup format. `settings` (migration 0005) holds cosmetic
+ *  presentation config with code defaults — nothing here needs to survive a restore. Adding a
+ *  table to the schema means adding it either to INSERT_ORDER or, deliberately, to this set. */
+export const BACKUP_EXCLUDED_TABLES = new Set<string>(["settings"]);
 
 // FK dependency order for inserts; reverse for deletes. NEVER trust row order from the file.
 export const INSERT_ORDER: TableName[] = [

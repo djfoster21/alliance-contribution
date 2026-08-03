@@ -243,3 +243,11 @@ export type Env = {
   ASSETS: Fetcher;
   API_RATE_LIMIT: RateLimit;
 };
+
+// ---- Settings (2026-08-03 rank-bands spec) ----------------------------------
+
+/** Rank-band sizes for the boards: first `top` counted members, then `mid`, remainder "rest". */
+export type RankBands = { top: number; mid: number };
+
+/** Served whenever a settings row is missing or unparseable; never seeded into the DB. */
+export const DEFAULT_RANK_BANDS: RankBands = { top: 30, mid: 20 };

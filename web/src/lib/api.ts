@@ -15,6 +15,7 @@ import type {
   NewAlias,
   OverallRanking,
   Overview,
+  RankBands,
   RosterImportBatch,
   RosterImportResult,
   WeeklyRanking,
@@ -158,6 +159,10 @@ export const api = {
     weekly: (week?: string, activity?: string) =>
       get<WeeklyRanking>(`/rankings/weekly${qs({ week, activity })}`),
     overall: (activity?: string) => get<OverallRanking>(`/rankings/overall${qs({ activity })}`),
+  },
+  settings: {
+    rankBands: () => get<RankBands>("/settings/rank-bands"),
+    saveRankBands: (bands: RankBands) => write<RankBands>("PUT", "/settings/rank-bands", bands),
   },
   weeks: () => get<string[]>("/weeks"),
   overview: () => get<Overview>("/overview"),
