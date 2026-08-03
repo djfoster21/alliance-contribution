@@ -1,4 +1,5 @@
 import { StatCard } from "@/components/overview/StatCard";
+import { rankTone } from "@/lib/alliance-rank";
 import { cn } from "@/lib/utils";
 import type { RosterRow, RosterStatus, RosterSummary } from "@/lib/roster-view";
 
@@ -10,25 +11,14 @@ function signed(value: number): string {
   return value < 0 ? `${MINUS}${Math.abs(value).toLocaleString()}` : `+${value.toLocaleString()}`;
 }
 
-/**
- * The in-game R-rank is a leadership hierarchy, so it is encoded by WEIGHT and darkness, not hue —
- * colour on 86 rows is reserved for movement and risk. R5/R4 pop out of a page of R1–R3 without it.
- */
-const TIER_CLASS: Record<string, string> = {
-  R5: "bg-foreground text-accent-foreground font-bold",
-  R4: "bg-secondary text-accent-foreground font-bold",
-  R3: "bg-muted-surface text-foreground font-bold",
-  R2: "bg-background text-muted font-semibold border border-border",
-  R1: "bg-background text-faint font-semibold border border-border",
-};
-
+/** R1–R5 chip on the roster — same per-rank tones as AllianceRankBadge (2026-08-03 spec). */
 export function RankChip({ rank }: { rank: string | null }) {
   if (rank === null) return <span className="text-faint">—</span>;
   return (
     <span
       className={cn(
-        "inline-flex h-[22px] w-8 items-center justify-center rounded-[6px] font-mono text-[11.5px]",
-        TIER_CLASS[rank] ?? "border border-border bg-background font-semibold text-muted",
+        "inline-flex h-[22px] w-8 items-center justify-center rounded-[6px] font-mono text-[11.5px] font-semibold",
+        rankTone(rank),
       )}
     >
       {rank}

@@ -1,21 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { assignBands, rankTone, LEADERSHIP_RANKS } from "../../web/src/lib/alliance-rank";
+import { assignBands, rankTone } from "../../web/src/lib/alliance-rank";
 
 describe("rankTone", () => {
   it("returns null for an unrecorded rank so callers render nothing", () => {
     expect(rankTone(null)).toBeNull();
   });
 
-  it("gives R4 and R5 the emphasized tone — they are appointed, not earned", () => {
-    for (const rank of [...LEADERSHIP_RANKS]) {
-      expect(rankTone(rank)).toBe("bg-accent-subtle text-accent");
-    }
-  });
-
-  it("gives R1-R3 the neutral tone", () => {
-    for (const rank of ["R1", "R2", "R3"]) {
-      expect(rankTone(rank)).toBe("bg-muted-surface text-muted");
-    }
+  it("gives each rank its own tone (R5 bold leadership, R4 lighter leadership)", () => {
+    expect(rankTone("R5")).toBe("bg-rank5-bg text-rank5-fg");
+    expect(rankTone("R4")).toBe("bg-rank4-bg text-rank4-fg");
+    expect(rankTone("R3")).toBe("bg-rank3-bg text-rank3-fg");
+    expect(rankTone("R2")).toBe("bg-rank2-bg text-rank2-fg");
+    expect(rankTone("R1")).toBe("bg-rank1-bg text-rank1-fg");
   });
 
   it("treats an unknown value as neutral rather than throwing", () => {
