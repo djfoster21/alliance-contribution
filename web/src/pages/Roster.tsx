@@ -1528,8 +1528,12 @@ export function Roster() {
   // so they look it up in memberById instead of taking `row.member` — see the actions cell.
   const allRows = useMemo<RosterRow<RosterMember>[]>(() => {
     if (historical) {
+      // useApi keeps prev.data while reloading, so mid-switch this would be the PREVIOUS date's
+      // rows under the new date's banner. Mislabeled numbers are worse than a brief blank —
+      // nothing on screen marks them stale — so loading/error render as empty.
+      const rows = historicalState.loading || historicalState.error ? [] : (historicalState.data?.rows ?? []);
       return buildRosterRows({
-        ...captureRosterInput(historicalState.data?.rows ?? []),
+        ...captureRosterInput(rows),
         attendance: null, // attendance is season-to-date — not reconstructible as-of a past date
       });
     }
@@ -1538,7 +1542,7 @@ export function Roster() {
       deltas: deltaByMember,
       attendance: attendanceByMember,
     });
-  }, [historical, historicalState.data, membersState.data, deltaByMember, attendanceByMember]);
+  }, [historical, historicalState, membersState.data, deltaByMember, attendanceByMember]);
 
   // Recovers the full `Member` behind a widened row for the action handlers. In live mode every row
   // resolves (rows come from the same array); in historical mode actions are hidden anyway.
@@ -1547,14 +1551,16 @@ export function Roster() {
     [membersState.data],
   );
 
-  const counts = useMemo(
-    () => ({
-      all: allRows.length,
-      active: allRows.filter((r) => r.member.active === 1).length,
-      inactive: allRows.filter((r) => r.member.active === 0).length,
-    }),
-    [allRows],
-  );
+  // Counts describe the LIVE roster in both modes — a capture cannot claim who is active
+  // (captureRosterInput fabricates active: 1), and the tabs these feed are live-only.
+  const counts = useMemo(() => {
+    const ms = membersState.data ?? [];
+    return {
+      all: ms.length,
+      active: ms.filter((m) => m.active === 1).length,
+      inactive: ms.filter((m) => m.active === 0).length,
+    };
+  }, [membersState.data]);
 
   const summary = useMemo(() => summarizeRoster(allRows), [allRows]);
   const scales = useMemo(() => rosterScales(allRows), [allRows]);
