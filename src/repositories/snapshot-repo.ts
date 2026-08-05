@@ -64,12 +64,19 @@ export class SnapshotRepo {
   // capture has no row for that date, so diffing against "the previous capture date" would attribute a
   // multi-capture move to a single week. Members with one observation come back with rn = 1 only.
   async lastTwoPerMember(): Promise<
-    { member_id: number; captured_on: string; power: number | null; power_position: number | null; rn: number }[]
+    {
+      member_id: number;
+      captured_on: string;
+      alliance_rank: string | null;
+      power: number | null;
+      power_position: number | null;
+      rn: number;
+    }[]
   > {
     return all(
       this.db,
-      `SELECT member_id, captured_on, power, power_position, rn FROM (
-         SELECT member_id, captured_on, power, power_position,
+      `SELECT member_id, captured_on, alliance_rank, power, power_position, rn FROM (
+         SELECT member_id, captured_on, alliance_rank, power, power_position,
                 ROW_NUMBER() OVER (PARTITION BY member_id ORDER BY captured_on DESC) AS rn
          FROM member_snapshots
        ) WHERE rn <= 2

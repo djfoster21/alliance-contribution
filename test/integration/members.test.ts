@@ -1210,10 +1210,19 @@ describe("GET /api/members/deltas", () => {
       delta_power: 200,
       delta_position: -2,
       since: "2026-05-04",
+      rank_from: null,
+      rank_to: null,
     });
 
     const fresh = deltas.find((d) => d.member_id === b.id);
-    expect(fresh).toEqual({ member_id: b.id, delta_power: null, delta_position: null, since: null });
+    expect(fresh).toEqual({
+      member_id: b.id,
+      delta_power: null,
+      delta_position: null,
+      since: null,
+      rank_from: null,
+      rank_to: null,
+    });
   });
 });
 

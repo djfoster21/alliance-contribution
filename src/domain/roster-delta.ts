@@ -157,6 +157,7 @@ export type SnapshotRank = {
   member_id: number;
   rn: number;
   captured_on: string;
+  alliance_rank: string | null;
   power: number | null;
   power_position: number | null;
 };
@@ -181,13 +182,28 @@ export function computeMemberDeltas(rows: SnapshotRank[]): MemberDelta[] {
     .map((cur) => {
       const prev = previous.get(cur.member_id);
       if (!prev) {
-        return { member_id: cur.member_id, delta_power: null, delta_position: null, since: null };
+        return {
+          member_id: cur.member_id,
+          delta_power: null,
+          delta_position: null,
+          since: null,
+          rank_from: null,
+          rank_to: null,
+        };
       }
+      // A null rank on either side means the badge was unreadable in that capture — unknown, not a
+      // change. Only a real non-null -> non-null difference gets the pair; same null rule as computeDelta.
+      const rankChanged =
+        cur.alliance_rank !== null &&
+        prev.alliance_rank !== null &&
+        cur.alliance_rank !== prev.alliance_rank;
       return {
         member_id: cur.member_id,
         delta_power: diff(cur.power, prev.power),
         delta_position: diff(cur.power_position, prev.power_position),
         since: prev.captured_on,
+        rank_from: rankChanged ? prev.alliance_rank : null,
+        rank_to: rankChanged ? cur.alliance_rank : null,
       };
     });
 }

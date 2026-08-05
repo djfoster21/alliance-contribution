@@ -226,6 +226,8 @@ export type MemberDelta = {
   delta_power: number | null;
   delta_position: number | null;    // negative = moved UP the power leaderboard
   since: string | null;             // the capture date being compared against
+  rank_from: string | null;   // previous observed rank — the pair is set together, and only
+  rank_to: string | null;     //   for a real change (non-null ≠ non-null); else both null
 };
 
 // The profile's power/position history. `captures` is EVERY capture date, ascending — `rows` holds only
