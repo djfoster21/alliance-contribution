@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Pencil, Tag, UserMinus, UserCheck, CheckCircle2, TriangleAlert, Upload } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Tag,
+  UserMinus,
+  UserCheck,
+  CalendarDays,
+  CheckCircle2,
+  TriangleAlert,
+  Upload,
+} from "lucide-react";
 import type {
   Alias,
   Attendance,
+  CaptureRosterRow,
+  CaptureSummary,
   Member,
   MemberDelta,
   RosterImportBatch,
@@ -17,11 +29,14 @@ import { normalizeName } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
 import {
   buildRosterRows,
+  captureRosterInput,
   filterRows,
   rosterScales,
   sortRows,
   summarizeRoster,
   topPowerIds,
+  type RosterMember,
+  type RosterRow,
   type RosterSort,
 } from "@/lib/roster-view";
 import {
@@ -614,6 +629,16 @@ const PARTIAL_PASTE_RATIO = 0.25;
 function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** "Jul 28, 2026" — UTC-pinned so the label can never shift a day off the capture date. */
+function fmtCaptureDate(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 /**
@@ -1485,14 +1510,41 @@ export function Roster() {
     [deltasState.data],
   );
 
-  const allRows = useMemo(
-    () =>
-      buildRosterRows({
-        members: membersState.data ?? [],
-        deltas: deltaByMember,
-        attendance: attendanceByMember,
-      }),
-    [membersState.data, deltaByMember, attendanceByMember],
+  // null = live view. A past capture date switches the table to the as-of view; selecting the
+  // newest capture in the dropdown maps back to null, so "latest" and "live" cannot drift apart.
+  const [viewDate, setViewDate] = useState<string | null>(null);
+
+  const capturesState = useApi<{ captures: CaptureSummary[] }>(() => api.members.captureList(), [reloadKey]);
+  const captures = capturesState.data?.captures ?? [];
+  const latestCaptureDate = captures[0]?.captured_on ?? null;
+
+  const historicalState = useApi<{ rows: CaptureRosterRow[] } | null>(
+    () => (viewDate === null ? Promise.resolve(null) : api.members.captureRoster(viewDate)),
+    [viewDate],
+  );
+  const historical = viewDate !== null;
+
+  // Widened to the six-field shape both modes produce. Row action handlers need the full `Member`,
+  // so they look it up in memberById instead of taking `row.member` — see the actions cell.
+  const allRows = useMemo<RosterRow<RosterMember>[]>(() => {
+    if (historical) {
+      return buildRosterRows({
+        ...captureRosterInput(historicalState.data?.rows ?? []),
+        attendance: null, // attendance is season-to-date — not reconstructible as-of a past date
+      });
+    }
+    return buildRosterRows({
+      members: membersState.data ?? [],
+      deltas: deltaByMember,
+      attendance: attendanceByMember,
+    });
+  }, [historical, historicalState.data, membersState.data, deltaByMember, attendanceByMember]);
+
+  // Recovers the full `Member` behind a widened row for the action handlers. In live mode every row
+  // resolves (rows come from the same array); in historical mode actions are hidden anyway.
+  const memberById = useMemo(
+    () => new Map((membersState.data ?? []).map((m) => [m.id, m])),
+    [membersState.data],
   );
 
   const counts = useMemo(
@@ -1507,7 +1559,11 @@ export function Roster() {
   const summary = useMemo(() => summarizeRoster(allRows), [allRows]);
   const scales = useMemo(() => rosterScales(allRows), [allRows]);
   const topIds = useMemo(() => topPowerIds(allRows, 10), [allRows]);
-  const rows = useMemo(() => sortRows(filterRows(allRows, filter), sort), [allRows, filter, sort]);
+  // Filtering is a no-op in historical mode: the tabs are hidden, every observed row shows.
+  const rows = useMemo(
+    () => sortRows(historical ? allRows : filterRows(allRows, filter), sort),
+    [allRows, historical, filter, sort],
+  );
 
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -1556,9 +1612,37 @@ export function Roster() {
             <CardTitle>Roster</CardTitle>
             <span className="text-[12px] text-muted">
               {counts.all} member{counts.all === 1 ? "" : "s"} · {counts.active} active
+              {latestCaptureDate && <> · last import {fmtCaptureDate(latestCaptureDate)}</>}
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {captures.length > 0 && (
+              <Select
+                value={viewDate ?? latestCaptureDate ?? undefined}
+                onValueChange={(v) => setViewDate(v === latestCaptureDate ? null : v)}
+              >
+                {/* Not <SelectValue/>: Radix mirrors the selected item's full text into the trigger,
+                    and the item line carries "· latest · N members" noise the trigger doesn't need. */}
+                <SelectTrigger className="w-44">
+                  <CalendarDays className="mr-1.5 size-4 shrink-0 text-muted" />
+                  <span className="num">{fmtCaptureDate(viewDate ?? latestCaptureDate!)}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 pb-1 pt-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-faint">
+                    Roster updates
+                  </div>
+                  {captures.map((s) => (
+                    // One line, not the mockup's two: SelectItem is fixed h-8 and a stacked child
+                    // would clip. "· latest" marks the entry that maps back to the live view.
+                    <SelectItem key={s.captured_on} value={s.captured_on} className="num">
+                      {fmtCaptureDate(s.captured_on)}
+                      {s.captured_on === latestCaptureDate ? " · latest" : ""} · {s.members} member
+                      {s.members === 1 ? "" : "s"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {role === "admin" && (
               <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
                 <Upload />
@@ -1572,21 +1656,34 @@ export function Roster() {
           </div>
         </CardHeader>
 
+        {historical && (
+          <div className="border-b border-border bg-muted-surface px-4 py-2 text-[12.5px] text-secondary">
+            Viewing the {fmtCaptureDate(viewDate!)} capture — changes vs each member's own prior
+            observation. Names shown are current.
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-            <TabsList>
-              {(["active", "inactive", "all"] as const).map((key) => (
-                // inline-flex is load-bearing: TabsTrigger's base classes set no display, so `gap`
-                // on a plain inline button is a no-op and the count would sit flush to the label.
-                <TabsTrigger key={key} value={key} className="inline-flex items-center gap-1.5 capitalize">
-                  {key}
-                  <span className="num rounded-[4px] bg-muted-surface px-1.5 text-[10.5px] font-semibold text-faint">
-                    {counts[key]}
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          {!historical ? (
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+              <TabsList>
+                {(["active", "inactive", "all"] as const).map((key) => (
+                  // inline-flex is load-bearing: TabsTrigger's base classes set no display, so `gap`
+                  // on a plain inline button is a no-op and the count would sit flush to the label.
+                  <TabsTrigger key={key} value={key} className="inline-flex items-center gap-1.5 capitalize">
+                    {key}
+                    <span className="num rounded-[4px] bg-muted-surface px-1.5 text-[10.5px] font-semibold text-faint">
+                      {counts[key]}
+                    </span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          ) : (
+            <span className="text-[12px] text-muted">
+              {rows.length} member{rows.length === 1 ? "" : "s"} observed
+            </span>
+          )}
 
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-faint">
@@ -1604,14 +1701,16 @@ export function Roster() {
           </div>
         </div>
 
-        {membersState.error ? (
+        {(historical ? historicalState.error : membersState.error) ? (
           <div className="p-4">
-            <ErrorState message={membersState.error} />
+            <ErrorState message={(historical ? historicalState.error : membersState.error)!} />
           </div>
-        ) : membersState.loading ? (
+        ) : (historical ? historicalState.loading : membersState.loading) ? (
           <LoadingState />
         ) : rows.length === 0 ? (
-          <EmptyState message="No members match this filter." />
+          <EmptyState
+            message={historical ? "No members observed in this capture." : "No members match this filter."}
+          />
         ) : (
           <>
             <Table>
@@ -1627,12 +1726,15 @@ export function Roster() {
                   </TableHead>
                   <TableHead className="w-[86px] text-center text-foreground">Move</TableHead>
                   <TableHead className="w-28 border-l border-muted-surface">Status</TableHead>
-                  <TableHead className="w-[104px] text-right">Actions</TableHead>
+                  {!historical && <TableHead className="w-[104px] text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => {
                   const m = r.member;
+                  // The full `Member` for the action handlers — rows are widened to the six-field
+                  // shape. Always resolves in live mode; historical hides the actions cell entirely.
+                  const live = historical ? undefined : memberById.get(m.id);
                   const top = topIds.has(m.id);
                   return (
                     <TableRow key={m.id} className={rowClass(r)}>
@@ -1675,49 +1777,51 @@ export function Roster() {
                       <TableCell className="border-l border-muted-surface">
                         <StatusCell status={r.status} />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-faint hover:text-foreground"
-                            aria-label={`Edit ${m.governor}`}
-                            onClick={() => setEditMember(m)}
-                          >
-                            <Pencil />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-faint hover:text-foreground"
-                            aria-label={`Rename ${m.governor}`}
-                            onClick={() => setRenameMember(m)}
-                          >
-                            <Tag />
-                          </Button>
-                          {m.active === 1 ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-faint hover:text-down"
-                              aria-label={`Deactivate ${m.governor}`}
-                              onClick={() => setDeactivateMember(m)}
-                            >
-                              <UserMinus />
-                            </Button>
-                          ) : (
+                      {live && (
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-0.5">
                             <Button
                               variant="ghost"
                               size="icon"
                               className="text-faint hover:text-foreground"
-                              aria-label={`Activate ${m.governor}`}
-                              onClick={() => activate(m)}
+                              aria-label={`Edit ${live.governor}`}
+                              onClick={() => setEditMember(live)}
                             >
-                              <UserCheck />
+                              <Pencil />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-faint hover:text-foreground"
+                              aria-label={`Rename ${live.governor}`}
+                              onClick={() => setRenameMember(live)}
+                            >
+                              <Tag />
+                            </Button>
+                            {live.active === 1 ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-faint hover:text-down"
+                                aria-label={`Deactivate ${live.governor}`}
+                                onClick={() => setDeactivateMember(live)}
+                              >
+                                <UserMinus />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-faint hover:text-foreground"
+                                aria-label={`Activate ${live.governor}`}
+                                onClick={() => activate(live)}
+                              >
+                                <UserCheck />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -1743,6 +1847,7 @@ export function Roster() {
         onOpenChange={setImportOpen}
         onApplied={() => {
           setNote("Roster imported — scores recomputed.");
+          setViewDate(null); // the operator just imported today; a stale historical view would hide it
           refresh();
         }}
       />
