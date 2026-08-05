@@ -1770,8 +1770,11 @@ export function Roster() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <RankChip rank={m.alliance_rank} />
-                        <RankChangeChip change={r.rankChange} />
+                        {/* relative anchor for the change badge riding the chip's corner */}
+                        <span className="relative inline-flex">
+                          <RankChip rank={m.alliance_rank} />
+                          <RankChangeChip change={r.rankChange} />
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <PowerCell power={m.power} maxPower={scales.maxPower} top={top} />

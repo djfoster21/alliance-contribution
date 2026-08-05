@@ -26,13 +26,23 @@ export function RankChip({ rank }: { rank: string | null }) {
   );
 }
 
-/** "R3→R4" under the rank chip — only when a real change was observed. Quiet otherwise. */
+/**
+ * Small badge overlapping the rank chip's top-right corner: direction triangle + the PREVIOUS
+ * rank ("▲R2" on a chip now showing R3 = promoted from R2). Only when a real change was
+ * observed; quiet otherwise. The parent must be `relative` — see the Rank cell in Roster.tsx.
+ */
 export function RankChangeChip({ change }: { change: { from: string; to: string } | null }) {
   if (!change) return null;
   const up = (TIER_ORDER[change.to] ?? 0) > (TIER_ORDER[change.from] ?? 0);
   return (
-    <span className={cn("num block text-[10.5px] font-semibold", up ? "text-up" : "text-down")}>
-      {change.from}→{change.to}
+    <span
+      className={cn(
+        "num absolute -right-3.5 -top-2 inline-flex items-center gap-px rounded-[4px] border px-[3px] py-px text-[8.5px] font-bold leading-none",
+        up ? "border-up/20 bg-up/10 text-up" : "border-down/20 bg-down/10 text-down",
+      )}
+    >
+      <span className="text-[7px] leading-none">{up ? "▲" : "▼"}</span>
+      {change.from}
     </span>
   );
 }
