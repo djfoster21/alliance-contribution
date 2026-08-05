@@ -63,6 +63,12 @@ export class MemberRepo {
     );
   }
 
+  // Hard delete. Merge is the one sanctioned caller — it moves aliases and snapshots off the member
+  // first, and the recompute re-resolves participations. Everything else deactivates.
+  async delete(id: number): Promise<void> {
+    await run(this.db, "DELETE FROM members WHERE id = ?", id);
+  }
+
   async deactivate(id: number): Promise<void> {
     await run(this.db, "UPDATE members SET active = 0, updated_at = datetime('now') WHERE id = ?", id);
   }

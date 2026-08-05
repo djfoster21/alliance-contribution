@@ -155,6 +155,24 @@ membersRoutes.patch("/:id", async (c) => {
   }
 });
 
+// Merge :id (the duplicate) into `into` (the survivor) — see MemberService.merge. Destructive
+// (deletes the source member), so admin-gated like /import.
+membersRoutes.post("/:id/merge", requireAdmin, async (c) => {
+  const id = Number(c.req.param("id"));
+  if (Number.isNaN(id)) return c.json({ error: "invalid id" }, 400);
+
+  const { memberService } = createServices(c.env.DB);
+
+  try {
+    const body = await c.req.json<{ into: number }>();
+    if (typeof body.into !== "number") return c.json({ error: "into must be a member id" }, 400);
+    return c.json(await memberService.merge(id, body.into));
+  } catch (err) {
+    const message = (err as Error).message;
+    return c.json({ error: message }, statusForError(message));
+  }
+});
+
 membersRoutes.post("/:id/rename", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "invalid id" }, 400);

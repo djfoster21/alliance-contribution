@@ -29,6 +29,8 @@ export type UpdateMemberInput = Partial<Pick<Member, "alliance_rank" | "power" |
 
 export type RenameResult = { member: Member; addedAlias: boolean; warning?: string };
 
+export type MergeResult = { member: Member; movedAliases: number; addedAlias: boolean; recomputed: number };
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLIANCE_RANKS = new Set(["R1", "R2", "R3", "R4", "R5"]);
 
@@ -215,6 +217,43 @@ export class MemberService {
     const fresh = await this.memberRepo.getById(id);
     if (!fresh) throw new Error("MemberService.rename: member missing after write");
     return { member: fresh, addedAlias, warning };
+  }
+
+  // Merge one member (source) into another (target): the source's names become target aliases, its
+  // snapshot history moves over, the source row is deleted, and one recompute re-attaches every
+  // participation logged under any of its names. The target survives untouched — to keep the new
+  // in-game name, merge the OLD record into the NEW one. Never suggested by the app (decoy-rename
+  // rule); always an explicit operator action.
+  async merge(sourceId: number, targetId: number): Promise<MergeResult> {
+    if (sourceId === targetId) throw new Error("Invalid merge: a member cannot be merged into itself");
+
+    const [source, target] = await Promise.all([
+      this.memberRepo.getById(sourceId),
+      this.memberRepo.getById(targetId),
+    ]);
+    if (!source) throw new Error(`merge source member ${sourceId} not found`);
+    if (!target) throw new Error(`merge target member ${targetId} not found`);
+
+    // Alias the source's governor FIRST (rename()'s ordering rationale): if this insert fails nothing
+    // has moved yet. Skip when the normalized key is already an alias (e.g. left behind by a partial
+    // rename) — after the reassign below it points at the target either way and already carries the
+    // history. The key cannot be the target's governor: governors are gated against shadowing each other.
+    const index = await this.loadNameIndex();
+    let addedAlias = false;
+    if (index.aliases.get(normalizeName(source.governor)) === undefined) {
+      await this.aliasRepo.insert({ alias: source.governor, member_id: targetId, note: "merge" });
+      addedAlias = true;
+    }
+
+    const movedAliases = await this.aliasRepo.reassignMember(sourceId, targetId);
+    await this.snapshotRepo.moveMember(sourceId, targetId);
+    await this.memberRepo.delete(sourceId);
+
+    const { updated } = await this.recompute.run();
+
+    const fresh = await this.memberRepo.getById(targetId);
+    if (!fresh) throw new Error("MemberService.merge: target missing after write");
+    return { member: fresh, movedAliases, addedAlias, recomputed: updated };
   }
 
   // Apply an already-decided roster import batch atomically. The operator (via the frontend) has already

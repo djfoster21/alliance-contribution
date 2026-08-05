@@ -24,6 +24,21 @@ export class SnapshotRepo {
     await batchChunked(this.db, [deleteStmt, ...insertStmts]);
   }
 
+  // Move one member's snapshot history to another — the merge path. Where both members were observed
+  // on the same capture date (UNIQUE (member_id, captured_on)), the TARGET's row wins and the source's
+  // is dropped. One db.batch so the delete and the move commit atomically.
+  async moveMember(from: number, to: number): Promise<void> {
+    await this.db.batch([
+      this.db
+        .prepare(
+          `DELETE FROM member_snapshots WHERE member_id = ?1
+             AND captured_on IN (SELECT captured_on FROM member_snapshots WHERE member_id = ?2)`,
+        )
+        .bind(from, to),
+      this.db.prepare("UPDATE member_snapshots SET member_id = ?2 WHERE member_id = ?1").bind(from, to),
+    ]);
+  }
+
   async countForDate(captured_on: string): Promise<number> {
     const row = await first<{ count: number }>(
       this.db,

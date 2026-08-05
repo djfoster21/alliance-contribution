@@ -62,6 +62,7 @@ export type ScoringConfig = { weight: number; tiers: ScoringTierInput[] };
 
 /** Result of a canonical rename: the updated member, whether the old name became an alias, optional warning. */
 export type RenameResult = { member: Member; addedAlias: boolean; warning?: string };
+export type MergeResult = { member: Member; movedAliases: number; addedAlias: boolean; recomputed: number };
 
 /** A retroactive conflict a resolution change introduced into the existing participation set. */
 export type AliasConflict =
@@ -189,6 +190,8 @@ export const api = {
       write<Member>("PATCH", `/members/${id}`, body),
     rename: (id: number, governor: string, opts?: { addAlias?: boolean }) =>
       write<RenameResult>("POST", `/members/${id}/rename`, { governor, addAlias: opts?.addAlias }),
+    // merge :id (the duplicate) into another member — admin only, deletes the source
+    merge: (id: number, into: number) => write<MergeResult>("POST", `/members/${id}/merge`, { into }),
     import: (batch: RosterImportBatch) => write<RosterImportResult>("POST", "/members/import", batch),
   },
 
