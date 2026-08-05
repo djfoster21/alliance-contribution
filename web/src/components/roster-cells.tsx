@@ -1,7 +1,7 @@
 import { StatCard } from "@/components/overview/StatCard";
 import { rankTone } from "@/lib/alliance-rank";
 import { cn } from "@/lib/utils";
-import type { RosterRow, RosterStatus, RosterSummary } from "@/lib/roster-view";
+import { TIER_ORDER, type RosterRow, type RosterStatus, type RosterSummary } from "@/lib/roster-view";
 
 /** U+2212. A hyphen is narrower than a digit and breaks tabular alignment down a numeric column. */
 const MINUS = "−";
@@ -26,12 +26,10 @@ export function RankChip({ rank }: { rank: string | null }) {
   );
 }
 
-const RANK_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4, R5: 5 };
-
 /** "R3→R4" under the rank chip — only when a real change was observed. Quiet otherwise. */
 export function RankChangeChip({ change }: { change: { from: string; to: string } | null }) {
   if (!change) return null;
-  const up = (RANK_ORDER[change.to] ?? 0) > (RANK_ORDER[change.from] ?? 0);
+  const up = (TIER_ORDER[change.to] ?? 0) > (TIER_ORDER[change.from] ?? 0);
   return (
     <span className={cn("num block text-[10.5px] font-semibold", up ? "text-up" : "text-down")}>
       {change.from}→{change.to}

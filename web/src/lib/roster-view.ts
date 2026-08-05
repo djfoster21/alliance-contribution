@@ -94,7 +94,8 @@ export function filterRows<M extends RosterMember>(rows: RosterRow<M>[], filter:
   return rows.filter((r) => r.member.active === wanted);
 }
 
-const TIER_ORDER: Record<string, number> = { R5: 5, R4: 4, R3: 3, R2: 2, R1: 1 };
+/** Exported for RankChangeChip's direction tint — one R-level map per side of the Worker/SPA boundary. */
+export const TIER_ORDER: Record<string, number> = { R5: 5, R4: 4, R3: 3, R2: 2, R1: 1 };
 
 /**
  * Triage order, most in need of attention first: someone slipping, then someone we cannot judge,
