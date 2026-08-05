@@ -56,6 +56,13 @@ membersRoutes.post("/import", requireAdmin, async (c) => {
   }
 });
 
+// Every capture date with its member count — the roster time-travel select's options. Static path,
+// registered above /captures/:date so the literal segment is never captured as a date param.
+membersRoutes.get("/captures", async (c) => {
+  const { memberService } = createServices(c.env.DB);
+  return c.json({ captures: await memberService.listCaptures() });
+});
+
 // How many snapshots a capture date already holds — the import wizard's overwrite guard. A plain GET,
 // not admin-gated: it reveals only a count for a date, no member data, matching the other GETs on this
 // router (list/:id/:id/profile are all readable by any authenticated tier, viewer included).
@@ -69,6 +76,22 @@ membersRoutes.get("/captures/:date", async (c) => {
       count: await memberService.captureCount(captured_on),
       latest: await memberService.latestCapture(),
     });
+  } catch (err) {
+    const message = (err as Error).message;
+    return c.json({ error: message }, statusForError(message));
+  }
+});
+
+// The roster as observed on one capture date (see MemberService.rosterForDate). 404 when the date
+// has no snapshot rows — unlike the sibling count endpoint, where zero is a real answer, an as-of
+// view of nothing is not. Malformed date → 400 via statusForError.
+membersRoutes.get("/captures/:date/roster", async (c) => {
+  const { memberService } = createServices(c.env.DB);
+
+  try {
+    const view = await memberService.rosterForDate(c.req.param("date"));
+    if (!view) return c.json({ error: "no capture on that date" }, 404);
+    return c.json(view);
   } catch (err) {
     const message = (err as Error).message;
     return c.json({ error: message }, statusForError(message));

@@ -7,7 +7,7 @@ import { MemberRepo } from "../../src/repositories/member-repo";
 import { SnapshotRepo } from "../../src/repositories/snapshot-repo";
 import { createServices } from "../../src/services";
 import type { UpdateMemberInput } from "../../src/services/member-service";
-import type { CaptureSummary, MemberDelta, MemberSnapshotSeries } from "../../shared/types";
+import type { CaptureRosterRow, CaptureSummary, MemberDelta, MemberSnapshotSeries } from "../../shared/types";
 
 const { DB, SEED_STATEMENTS } = env;
 
@@ -1413,5 +1413,71 @@ describe("MemberService time-travel", () => {
     const { memberService } = createServices(DB);
     expect(await memberService.rosterForDate("1899-01-01")).toBeNull();
     await expect(memberService.rosterForDate("not-a-date")).rejects.toThrow(/YYYY-MM-DD/);
+  });
+
+  it("serves capture list and as-of roster over HTTP", async () => {
+    const { memberService } = createServices(DB);
+    const snapshots = new SnapshotRepo(DB);
+
+    const m = await memberService.create({ governor: "TtHttp" });
+    const n = await memberService.create({ governor: "TtHttpNullBase" });
+    await snapshots.replaceForDate("2031-02-01", [
+      { member_id: m.id, captured_on: "2031-02-01", alliance_rank: "R2", power: 100, power_position: 5 },
+      { member_id: n.id, captured_on: "2031-02-01", alliance_rank: "R2", power: null, power_position: null },
+    ]);
+    await snapshots.replaceForDate("2031-02-08", [
+      { member_id: m.id, captured_on: "2031-02-08", alliance_rank: "R2", power: 130, power_position: 4 },
+      { member_id: n.id, captured_on: "2031-02-08", alliance_rank: "R2", power: 500, power_position: 9 },
+    ]);
+
+    const listRes = await SELF.fetch("https://x/api/members/captures", { headers: AUTH });
+    expect(listRes.status).toBe(200);
+    const { captures } = (await listRes.json()) as { captures: CaptureSummary[] };
+    const mine = captures.filter((s) => s.captured_on.startsWith("2031-02-"));
+    expect(mine).toEqual([
+      { captured_on: "2031-02-08", members: 2 },
+      { captured_on: "2031-02-01", members: 2 },
+    ]);
+
+    const rosterRes = await SELF.fetch("https://x/api/members/captures/2031-02-08/roster", {
+      headers: AUTH,
+    });
+    expect(rosterRes.status).toBe(200);
+    const { rows } = (await rosterRes.json()) as { rows: CaptureRosterRow[] };
+    const byId = new Map(rows.map((r) => [r.member_id, r]));
+    expect(byId.get(m.id)).toEqual({
+      member_id: m.id,
+      governor: "TtHttp",
+      alliance_rank: "R2",
+      power: 130,
+      power_position: 4,
+      delta_power: 30,
+      delta_position: -1,
+      since: "2031-02-01",
+    });
+    // Null on the BASELINE side: baseline exists (since set) but deltas stay null — unknown, not zero.
+    expect(byId.get(n.id)).toMatchObject({
+      power: 500,
+      delta_power: null,
+      delta_position: null,
+      since: "2031-02-01",
+    });
+
+    // The pre-existing capture-count endpoint still answers beside the two new routes.
+    const countRes = await SELF.fetch("https://x/api/members/captures/2031-02-08", { headers: AUTH });
+    expect(countRes.status).toBe(200);
+    expect(((await countRes.json()) as { count: number }).count).toBe(2);
+  });
+
+  it("as-of roster: 404 unknown date, 400 malformed date", async () => {
+    const missing = await SELF.fetch("https://x/api/members/captures/1899-01-01/roster", {
+      headers: AUTH,
+    });
+    expect(missing.status).toBe(404);
+
+    const malformed = await SELF.fetch("https://x/api/members/captures/not-a-date/roster", {
+      headers: AUTH,
+    });
+    expect(malformed.status).toBe(400);
   });
 });
