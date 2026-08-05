@@ -247,9 +247,13 @@ export class MemberService {
 
     const movedAliases = await this.aliasRepo.reassignMember(sourceId, targetId);
     await this.snapshotRepo.moveMember(sourceId, targetId);
-    await this.memberRepo.delete(sourceId);
 
+    // Recompute BEFORE deleting the source: participations.member_id has no ON DELETE clause, so the
+    // delete is FK-blocked while any row still points at the source. The names all resolve to the
+    // target now (alias-first beats the source's still-present governor), so this rewrites every such
+    // row — after which the delete cannot trip the FK.
     const { updated } = await this.recompute.run();
+    await this.memberRepo.delete(sourceId);
 
     const fresh = await this.memberRepo.getById(targetId);
     if (!fresh) throw new Error("MemberService.merge: target missing after write");

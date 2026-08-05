@@ -288,6 +288,67 @@ describe("MemberService", () => {
   });
 });
 
+describe("MemberService.merge", () => {
+  it("merges a duplicate with participation history into the survivor and deletes it", async () => {
+    const { memberService, eventService } = createServices(DB);
+    const aliasRepo = new AliasRepo(DB);
+    const snapshotRepo = new SnapshotRepo(DB);
+
+    const target = await memberService.create({ governor: "MergeMain" });
+    const source = await memberService.create({ governor: "MergeDup" });
+    await aliasRepo.insert({ alias: "MergeDupAlias", member_id: source.id, note: null });
+
+    // History under the duplicate's name — participations.member_id has NO ON DELETE clause, so this
+    // is exactly the row that makes a delete-before-recompute merge trip the FK.
+    const event = await eventService.create({
+      activity: "contribution",
+      date: "2025-01-06",
+      rows: [{ raw_name: "MergeDup", value: 25000 }],
+    });
+    expect(event.rows[0].member_id).toBe(source.id);
+
+    // Snapshot histories that overlap on one capture date — the target's row must win.
+    await snapshotRepo.replaceForDate("2025-01-05", [
+      { member_id: target.id, captured_on: "2025-01-05", alliance_rank: "R4", power: 100, power_position: 1 },
+      { member_id: source.id, captured_on: "2025-01-05", alliance_rank: "R1", power: 50, power_position: 2 },
+    ]);
+    await snapshotRepo.replaceForDate("2025-01-04", [
+      { member_id: source.id, captured_on: "2025-01-04", alliance_rank: "R1", power: 40, power_position: 3 },
+    ]);
+
+    const result = await memberService.merge(source.id, target.id);
+    expect(result.member.id).toBe(target.id);
+    expect(result.addedAlias).toBe(true);
+    expect(result.movedAliases).toBe(1);
+
+    // The duplicate is gone; its names now resolve to the survivor.
+    expect(await memberService.get(source.id)).toBeNull();
+    expect((await aliasRepo.getByAlias("MergeDup"))?.member_id).toBe(target.id);
+    expect((await aliasRepo.getByAlias("MergeDupAlias"))?.member_id).toBe(target.id);
+
+    // The historical row re-resolved to the survivor with its points intact.
+    const after = await eventService.get(event.event.id);
+    expect(after?.participations[0].member_id).toBe(target.id);
+    expect(after?.participations[0].points).toBe(1);
+
+    // Snapshots: the non-conflicting date moved, the conflicting date kept the target's row.
+    const snaps = await snapshotRepo.listForMember(target.id);
+    expect(snaps.map((s) => [s.captured_on, s.power])).toEqual([
+      ["2025-01-04", 40],
+      ["2025-01-05", 100],
+    ]);
+  });
+
+  it("rejects self-merge and missing members", async () => {
+    const { memberService } = createServices(DB);
+    const member = await memberService.create({ governor: "MergeSelf" });
+
+    await expect(memberService.merge(member.id, member.id)).rejects.toThrow(/cannot be merged into itself/);
+    await expect(memberService.merge(999999, member.id)).rejects.toThrow(/not found/);
+    await expect(memberService.merge(member.id, 999999)).rejects.toThrow(/not found/);
+  });
+});
+
 describe("MemberService.importRoster", () => {
   it("updates an existing member's meta from an updates entry", async () => {
     const { memberService } = createServices(DB);
