@@ -237,6 +237,20 @@ export type MemberSnapshotSeries = { captures: string[]; rows: MemberSnapshot[] 
 // One entry of the roster time-travel select: a capture date and how many members it observed.
 export type CaptureSummary = { captured_on: string; members: number };
 
+// One row of the roster time-travel view: a member as observed on that capture date, plus their
+// change vs their OWN previous observation. Same null rule as MemberDelta: unreadable = unknown,
+// not zero. `governor` is the member's CURRENT name, not the name pasted that day.
+export type CaptureRosterRow = {
+  member_id: number;
+  governor: string;
+  alliance_rank: string | null;
+  power: number | null;
+  power_position: number | null;
+  delta_power: number | null;
+  delta_position: number | null; // negative = moved UP the power leaderboard
+  since: string | null;          // baseline capture date, null = first observation
+};
+
 // Worker bindings.
 export type Env = {
   DB: D1Database;

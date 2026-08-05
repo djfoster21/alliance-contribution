@@ -4,9 +4,10 @@ import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { AliasRepo } from "../../src/repositories/alias-repo";
 import { MemberRepo } from "../../src/repositories/member-repo";
+import { SnapshotRepo } from "../../src/repositories/snapshot-repo";
 import { createServices } from "../../src/services";
 import type { UpdateMemberInput } from "../../src/services/member-service";
-import type { MemberDelta, MemberSnapshotSeries } from "../../shared/types";
+import type { CaptureSummary, MemberDelta, MemberSnapshotSeries } from "../../shared/types";
 
 const { DB, SEED_STATEMENTS } = env;
 
@@ -1353,5 +1354,64 @@ describe("MemberService.importRoster — backdated captures", () => {
     const current = await memberService.get(m.id);
     expect(current?.power).toBe(900);
     expect(current?.power_position).toBe(3);
+  });
+});
+
+describe("MemberService time-travel", () => {
+  it("rosterForDate returns as-of rows with per-member deltas; listCaptures lists the dates", async () => {
+    const { memberService } = createServices(DB);
+    const snapshots = new SnapshotRepo(DB);
+
+    const a = await memberService.create({ governor: "TtAlpha" });
+    const b = await memberService.create({ governor: "TtBravo" });
+    const c = await memberService.create({ governor: "TtCharlie" });
+
+    // Capture 1: a + b. Capture 2: a (changed) + c (first observation). b absent from 2.
+    await snapshots.replaceForDate("2031-01-01", [
+      { member_id: a.id, captured_on: "2031-01-01", alliance_rank: "R2", power: 100, power_position: 2 },
+      { member_id: b.id, captured_on: "2031-01-01", alliance_rank: "R3", power: 200, power_position: 1 },
+    ]);
+    await snapshots.replaceForDate("2031-01-08", [
+      { member_id: a.id, captured_on: "2031-01-08", alliance_rank: "R3", power: 150, power_position: 1 },
+      { member_id: c.id, captured_on: "2031-01-08", alliance_rank: null, power: null, power_position: null },
+    ]);
+
+    const view = await memberService.rosterForDate("2031-01-08");
+    expect(view).not.toBeNull();
+    const rows = new Map(view!.rows.map((r) => [r.member_id, r]));
+
+    // a: observed with deltas vs 01-01.
+    expect(rows.get(a.id)).toEqual({
+      member_id: a.id,
+      governor: "TtAlpha",
+      alliance_rank: "R3",
+      power: 150,
+      power_position: 1,
+      delta_power: 50,
+      delta_position: -1,
+      since: "2031-01-01",
+    });
+    // b: absent — a gap, not a zero.
+    expect(rows.has(b.id)).toBe(false);
+    // c: first observation — null deltas, null since.
+    expect(rows.get(c.id)).toMatchObject({ delta_power: null, delta_position: null, since: null });
+
+    // Earliest capture: rows exist, no baselines.
+    const first = await memberService.rosterForDate("2031-01-01");
+    expect(first!.rows.every((r) => r.since === null)).toBe(true);
+
+    // Capture list includes both dates, newest first, with counts.
+    const captures: CaptureSummary[] = await memberService.listCaptures();
+    const mine = captures.filter((s) => s.captured_on.startsWith("2031-01-"));
+    expect(mine).toEqual([
+      { captured_on: "2031-01-08", members: 2 },
+      { captured_on: "2031-01-01", members: 2 },
+    ]);
+  });
+
+  it("rosterForDate: null for an unknown date, throws on a malformed one", async () => {
+    const { memberService } = createServices(DB);
+    expect(await memberService.rosterForDate("1899-01-01")).toBeNull();
+    await expect(memberService.rosterForDate("not-a-date")).rejects.toThrow(/YYYY-MM-DD/);
   });
 });

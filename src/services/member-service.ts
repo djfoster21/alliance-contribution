@@ -1,5 +1,7 @@
 import type {
   Alias,
+  CaptureRosterRow,
+  CaptureSummary,
   Member,
   MemberDelta,
   MemberSnapshot,
@@ -107,6 +109,51 @@ export class MemberService {
   // can render a dash on the row instead of leaving a hole.
   async deltas(): Promise<MemberDelta[]> {
     return computeMemberDeltas(await this.snapshotRepo.lastTwoPerMember());
+  }
+
+  // Every capture date with its member count, newest first — the time-travel select's options.
+  async listCaptures(): Promise<CaptureSummary[]> {
+    return this.snapshotRepo.listCaptures();
+  }
+
+  // The roster as observed on one capture date, each row carrying the member's change vs their OWN
+  // previous observation (latestPerMemberBefore — a member absent from the prior capture falls back
+  // to their last real one). Null for a valid date with no capture, so the route can 404; a malformed
+  // date throws (route → 400). Names are current governors — history re-reads under renames, matching
+  // the recompute-from-current-config philosophy.
+  async rosterForDate(captured_on: string): Promise<{ rows: CaptureRosterRow[] } | null> {
+    if (!isCalendarDate(captured_on)) throw new Error("Invalid captured_on: must be YYYY-MM-DD");
+
+    const rows = await this.snapshotRepo.listForDate(captured_on);
+    if (rows.length === 0) return null;
+
+    const [members, previous] = await Promise.all([
+      this.memberRepo.list(),
+      this.snapshotRepo.latestPerMemberBefore(captured_on),
+    ]);
+    const nameById = new Map(members.map((m) => [m.id, m.governor]));
+    const baseline = new Map(previous.map((p) => [p.member_id, p]));
+
+    return {
+      rows: rows.map((r) => {
+        const b = baseline.get(r.member_id);
+        return {
+          member_id: r.member_id,
+          // FK guarantees the member exists; the fallback only guards a race with a concurrent delete.
+          governor: nameById.get(r.member_id) ?? "(unknown member)",
+          alliance_rank: r.alliance_rank,
+          power: r.power,
+          power_position: r.power_position,
+          delta_power:
+            b && r.power !== null && b.power !== null ? r.power - b.power : null,
+          delta_position:
+            b && r.power_position !== null && b.power_position !== null
+              ? r.power_position - b.power_position
+              : null,
+          since: b?.captured_on ?? null,
+        };
+      }),
+    };
   }
 
   // One member's observation history plus the full capture axis. Returns null for an unknown member so
