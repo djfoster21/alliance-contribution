@@ -43,6 +43,7 @@ import {
   MoveCell,
   PowerCell,
   PowerChangeCell,
+  RankChangeChip,
   RankChip,
   RosterLegend,
   RosterStats,
@@ -1770,6 +1771,7 @@ export function Roster() {
                       </TableCell>
                       <TableCell className="text-center">
                         <RankChip rank={m.alliance_rank} />
+                        <RankChangeChip change={r.rankChange} />
                       </TableCell>
                       <TableCell className="text-right">
                         <PowerCell power={m.power} maxPower={scales.maxPower} top={top} />

@@ -102,6 +102,18 @@ describe("buildRosterRows", () => {
     // Member-typed action handlers.
     expect(rows[0].member.created_at).toBe("2026-01-01");
   });
+
+  it("carries a rank change through to the row", () => {
+    const deltas = new Map([[1, { member_id: 1, delta_power: 5, delta_position: 0, since: "2030-01-01", rank_from: "R3", rank_to: "R4" }]]);
+    const rows = buildRosterRows({ members: [member()], deltas, attendance: null });
+    expect(rows[0].rankChange).toEqual({ from: "R3", to: "R4" });
+  });
+
+  it("no rank pair → null rankChange (incl. historical adapter rows)", () => {
+    const input = captureRosterInput([captureRow({})]);
+    const rows = buildRosterRows({ ...input, attendance: null });
+    expect(rows[0].rankChange).toBeNull();
+  });
 });
 
 import { filterRows, sortRows, type RosterRow } from "../../web/src/lib/roster-view";
@@ -115,6 +127,7 @@ function row(over: Partial<RosterMember> & { move?: number | null; deltaPower?: 
     move,
     attendance: 1,
     status: memberOver.active === 0 ? "inactive" : "active",
+    rankChange: null,
   };
 }
 

@@ -26,6 +26,10 @@ export type RosterDeltaLike = {
   delta_power: number | null;
   delta_position: number | null;
   since: string | null;
+  // Optional: captureRosterInput's entries carry no pair, and other structural callers must stay
+  // valid without them. Set together only for a real observed change (see MemberDelta).
+  rank_from?: string | null;
+  rank_to?: string | null;
 };
 
 /**
@@ -47,6 +51,8 @@ export type RosterRow<M extends RosterMember = RosterMember> = {
   move: number | null;
   attendance: number | null; // 0..1, or null when there is no attendance to judge on
   status: RosterStatus;
+  /** Observed alliance-rank change vs the member's own previous observation. Null = no change observed. */
+  rankChange: { from: string; to: string } | null;
 };
 
 export function buildRosterRows<M extends RosterMember>(input: {
@@ -68,6 +74,7 @@ export function buildRosterRows<M extends RosterMember>(input: {
       move: delta?.delta_position == null ? null : -delta.delta_position || 0,
       attendance,
       status: deriveStatus(member, attendance),
+      rankChange: delta?.rank_from != null && delta?.rank_to != null ? { from: delta.rank_from, to: delta.rank_to } : null,
     };
   });
 }

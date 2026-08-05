@@ -26,6 +26,19 @@ export function RankChip({ rank }: { rank: string | null }) {
   );
 }
 
+const RANK_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4, R5: 5 };
+
+/** "R3→R4" under the rank chip — only when a real change was observed. Quiet otherwise. */
+export function RankChangeChip({ change }: { change: { from: string; to: string } | null }) {
+  if (!change) return null;
+  const up = (RANK_ORDER[change.to] ?? 0) > (RANK_ORDER[change.from] ?? 0);
+  return (
+    <span className={cn("num block text-[10.5px] font-semibold", up ? "text-up" : "text-down")}>
+      {change.from}→{change.to}
+    </span>
+  );
+}
+
 /** A right-filled 3px bar. `pct` is already clamped 0..100 by the callers below. */
 function Bar({ pct, className, width }: { pct: number; className: string; width: string }) {
   return (
