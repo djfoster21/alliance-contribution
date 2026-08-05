@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildRosterRows, type RosterMember } from "../../web/src/lib/roster-view";
+import {
+  buildRosterRows,
+  captureRosterInput,
+  type CaptureRosterRowLike,
+  type RosterMember,
+} from "../../web/src/lib/roster-view";
 
 /** Minimal member; every test overrides only what it cares about. */
 function member(over: Partial<RosterMember> = {}): RosterMember {
@@ -304,8 +309,6 @@ describe("sortRows by status", () => {
     expect(rows.map((r) => r.member.id)).toEqual([1, 2]);
   });
 });
-
-import { captureRosterInput, type CaptureRosterRowLike } from "../../web/src/lib/roster-view";
 
 const captureRow = (over: Partial<CaptureRosterRowLike>): CaptureRosterRowLike => ({
   member_id: 1,
