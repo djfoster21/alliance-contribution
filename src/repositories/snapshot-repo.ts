@@ -1,4 +1,4 @@
-import type { MemberSnapshot, NewMemberSnapshot } from "../../shared/types";
+import type { CaptureSummary, MemberSnapshot, NewMemberSnapshot } from "../../shared/types";
 import { all, batchChunked, buildMultiRowInsert, first } from "./db";
 
 const COLUMNS = ["member_id", "captured_on", "alliance_rank", "power", "power_position"];
@@ -85,6 +85,25 @@ export class SnapshotRepo {
       "SELECT DISTINCT captured_on FROM member_snapshots ORDER BY captured_on",
     );
     return rows.map((r) => r.captured_on);
+  }
+
+  // Every capture with its member count, newest first — the time-travel select's option list.
+  async listCaptures(): Promise<CaptureSummary[]> {
+    return all<CaptureSummary>(
+      this.db,
+      `SELECT captured_on, COUNT(*) AS members FROM member_snapshots
+       GROUP BY captured_on ORDER BY captured_on DESC`,
+    );
+  }
+
+  // Every snapshot row of one capture date. Rides idx_snapshot_date.
+  async listForDate(captured_on: string): Promise<MemberSnapshot[]> {
+    return all<MemberSnapshot>(
+      this.db,
+      `SELECT id, member_id, captured_on, alliance_rank, power, power_position
+       FROM member_snapshots WHERE captured_on = ?`,
+      captured_on,
+    );
   }
 
   // Members who already have an observation NEWER than `captured_on`. A backdated import must not move

@@ -115,4 +115,46 @@ describe("SnapshotRepo", () => {
 
     expect((await repo.listForMember(a)).map((r) => r.captured_on)).toEqual(["2030-05-01", "2030-05-08"]);
   });
+
+  it("lists captures newest first with member counts", async () => {
+    const [a, b] = [await newMember("ListCapA"), await newMember("ListCapB")];
+
+    await repo.replaceForDate("2030-06-01", [
+      { member_id: a, captured_on: "2030-06-01", alliance_rank: "R2", power: 1, power_position: 1 },
+      { member_id: b, captured_on: "2030-06-01", alliance_rank: "R2", power: 2, power_position: 2 },
+    ]);
+    await repo.replaceForDate("2030-06-08", [
+      { member_id: a, captured_on: "2030-06-08", alliance_rank: "R2", power: 3, power_position: 1 },
+    ]);
+
+    const captures = await repo.listCaptures();
+    // Other tests own other dates — assert on OUR two, and on their relative order.
+    const mine = captures.filter((c) => c.captured_on.startsWith("2030-06-"));
+    expect(mine).toEqual([
+      { captured_on: "2030-06-08", members: 1 },
+      { captured_on: "2030-06-01", members: 2 },
+    ]);
+    const dates = captures.map((c) => c.captured_on);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it("lists a single date's snapshot rows", async () => {
+    const [a, b] = [await newMember("ForDateA"), await newMember("ForDateB")];
+
+    await repo.replaceForDate("2030-07-01", [
+      { member_id: a, captured_on: "2030-07-01", alliance_rank: "R4", power: 10, power_position: 1 },
+      { member_id: b, captured_on: "2030-07-01", alliance_rank: null, power: null, power_position: null },
+    ]);
+    await repo.replaceForDate("2030-07-08", [
+      { member_id: a, captured_on: "2030-07-08", alliance_rank: "R4", power: 20, power_position: 1 },
+    ]);
+
+    const rows = await repo.listForDate("2030-07-01");
+    expect(rows).toHaveLength(2);
+    const byId = new Map(rows.map((r) => [r.member_id, r]));
+    expect(byId.get(a)).toMatchObject({ captured_on: "2030-07-01", alliance_rank: "R4", power: 10 });
+    expect(byId.get(b)).toMatchObject({ alliance_rank: null, power: null, power_position: null });
+
+    expect(await repo.listForDate("1900-01-01")).toEqual([]);
+  });
 });

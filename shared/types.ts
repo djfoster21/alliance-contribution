@@ -234,6 +234,9 @@ export type MemberDelta = {
 // collapse (or recovery) that never happened.
 export type MemberSnapshotSeries = { captures: string[]; rows: MemberSnapshot[] };
 
+// One entry of the roster time-travel select: a capture date and how many members it observed.
+export type CaptureSummary = { captured_on: string; members: number };
+
 // Worker bindings.
 export type Env = {
   DB: D1Database;
