@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Merge,
   Plus,
   Pencil,
   Tag,
@@ -22,7 +23,7 @@ import type {
   RosterImportResult,
 } from "@shared/types";
 import { api, ApiError } from "@/lib/api";
-import type { RenameResult } from "@/lib/api";
+import type { MergeResult, RenameResult } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { useApiKey } from "@/lib/apiKey";
 import { normalizeName } from "@/lib/normalize";
@@ -534,6 +535,106 @@ function RenameMemberDialog({
 }
 
 /** Confirm dialog for deactivating a member (no hard delete — history stays scorable). */
+/**
+ * Merge dialog — merges the duplicate (source) into a picked survivor. The source's names become
+ * the survivor's aliases, its snapshots and participation history move over, and the row is
+ * deleted. Deliberate operator action only — the app never suggests two names are the same person
+ * (decoy-rename rule).
+ */
+function MergeMemberDialog({
+  member,
+  members,
+  onCancel,
+  onSuccess,
+}: {
+  member: Member | null;
+  members: Member[];
+  onCancel: () => void;
+  onSuccess: (result: MergeResult) => void;
+}) {
+  const [targetId, setTargetId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (member) {
+      setTargetId(null);
+      setSubmitting(false);
+      setError(null);
+    }
+  }, [member]);
+
+  const target = targetId === null ? undefined : members.find((m) => m.id === targetId);
+  const candidates = useMemo(
+    () => members.filter((m) => m.id !== member?.id),
+    [members, member],
+  );
+
+  const submit = async () => {
+    if (!member || targetId === null) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      onSuccess(await api.members.merge(member.id, targetId));
+    } catch (e) {
+      setError(writeErrorMessage(e));
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={member !== null}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Merge member</DialogTitle>
+          {member && (
+            <DialogDescription>
+              Merge duplicate{" "}
+              <span className="font-medium text-foreground">{member.governor}</span> into the
+              member it really is. Use when a rename was mistaken for a new person.
+            </DialogDescription>
+          )}
+        </DialogHeader>
+
+        {member && (
+          <div className="flex flex-col gap-4">
+            {error && <ErrorState message={error} />}
+
+            <Field label="Merge into">
+              <MemberSearchSelect members={candidates} value={targetId} onChange={setTargetId} />
+            </Field>
+
+            {target && (
+              <div className="flex items-start gap-2 rounded-[6px] border border-warn/20 bg-warn/5 p-3 text-[13px] text-warn">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  “{member.governor}” and its aliases become aliases of{" "}
+                  <span className="font-semibold">{target.governor}</span>; its history and
+                  snapshots move over; the duplicate row is deleted. Cannot be undone.
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button variant="danger" size="sm" onClick={submit} disabled={submitting || !target}>
+                {submitting ? "Merging…" : "Merge"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DeactivateDialog({
   member,
   onCancel,
@@ -1576,6 +1677,7 @@ export function Roster() {
   const [importOpen, setImportOpen] = useState(false);
   const [editMember, setEditMember] = useState<Member | null>(null);
   const [renameMember, setRenameMember] = useState<Member | null>(null);
+  const [mergeMember, setMergeMember] = useState<Member | null>(null);
   const [deactivateMember, setDeactivateMember] = useState<Member | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -1809,6 +1911,17 @@ export function Roster() {
                             >
                               <Tag />
                             </Button>
+                            {role === "admin" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-faint hover:text-foreground"
+                                aria-label={`Merge ${live.governor} into another member`}
+                                onClick={() => setMergeMember(live)}
+                              >
+                                <Merge />
+                              </Button>
+                            )}
                             {live.active === 1 ? (
                               <Button
                                 variant="ghost"
@@ -1879,6 +1992,19 @@ export function Roster() {
         onSuccess={(governor) => {
           setRenameMember(null);
           setNote(`Renamed to ${governor} — scores recomputed.`);
+          refresh();
+        }}
+      />
+
+      <MergeMemberDialog
+        member={mergeMember}
+        members={membersState.data ?? []}
+        onCancel={() => setMergeMember(null)}
+        onSuccess={(result) => {
+          setMergeMember(null);
+          setNote(
+            `Merged into ${result.member.governor} — history and aliases moved, scores recomputed.`,
+          );
           refresh();
         }}
       />

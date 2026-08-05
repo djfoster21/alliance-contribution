@@ -41,6 +41,12 @@ export class AliasRepo {
     await run(this.db, "DELETE FROM aliases WHERE id = ?", id);
   }
 
+  // Move every alias of one member to another — the merge path. Returns how many moved.
+  async reassignMember(from: number, to: number): Promise<number> {
+    const result = await run(this.db, "UPDATE aliases SET member_id = ? WHERE member_id = ?", to, from);
+    return result.meta.changes ?? 0;
+  }
+
   async list(opts?: { member_id?: number }): Promise<Alias[]> {
     if (opts?.member_id !== undefined) {
       return all<Alias>(this.db, "SELECT * FROM aliases WHERE member_id = ? ORDER BY id", opts.member_id);
