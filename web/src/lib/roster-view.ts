@@ -209,3 +209,45 @@ export function topPowerIds(rows: RosterRow[], n: number): Set<number> {
       .map((r) => r.member.id),
   );
 }
+
+/**
+ * One row of the time-travel payload (GET /api/members/captures/:date/roster). Structural mirror
+ * of shared CaptureRosterRow — this module deliberately avoids path aliases (see header comment).
+ */
+export type CaptureRosterRowLike = {
+  member_id: number;
+  governor: string;
+  alliance_rank: string | null;
+  power: number | null;
+  power_position: number | null;
+  delta_power: number | null;
+  delta_position: number | null;
+  since: string | null;
+};
+
+/**
+ * Adapts a historical capture payload to buildRosterRows input. A capture holds observed members
+ * only and says nothing about active/inactive (absence ≠ departure), so every row renders as
+ * active; the page passes attendance: null alongside, which turns the STATUS column into dashes.
+ */
+export function captureRosterInput(rows: CaptureRosterRowLike[]): {
+  members: RosterMember[];
+  deltas: Map<number, RosterDeltaLike>;
+} {
+  return {
+    members: rows.map((r) => ({
+      id: r.member_id,
+      governor: r.governor,
+      alliance_rank: r.alliance_rank,
+      power: r.power,
+      power_position: r.power_position,
+      active: 1,
+    })),
+    deltas: new Map(
+      rows.map((r) => [
+        r.member_id,
+        { member_id: r.member_id, delta_power: r.delta_power, delta_position: r.delta_position, since: r.since },
+      ]),
+    ),
+  };
+}

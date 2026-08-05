@@ -304,3 +304,41 @@ describe("sortRows by status", () => {
     expect(rows.map((r) => r.member.id)).toEqual([1, 2]);
   });
 });
+
+import { captureRosterInput, type CaptureRosterRowLike } from "../../web/src/lib/roster-view";
+
+const captureRow = (over: Partial<CaptureRosterRowLike>): CaptureRosterRowLike => ({
+  member_id: 1,
+  governor: "Alpha",
+  alliance_rank: "R2",
+  power: 100,
+  power_position: 3,
+  delta_power: 10,
+  delta_position: -2,
+  since: "2031-01-01",
+  ...over,
+});
+
+describe("captureRosterInput", () => {
+  it("adapts capture rows to buildRosterRows input", () => {
+    const input = captureRosterInput([
+      captureRow({}),
+      captureRow({ member_id: 2, governor: "Bravo", delta_power: null, delta_position: null, since: null }),
+    ]);
+
+    expect(input.members).toEqual([
+      { id: 1, governor: "Alpha", alliance_rank: "R2", power: 100, power_position: 3, active: 1 },
+      { id: 2, governor: "Bravo", alliance_rank: "R2", power: 100, power_position: 3, active: 1 },
+    ]);
+    expect(input.deltas.get(1)).toEqual({ member_id: 1, delta_power: 10, delta_position: -2, since: "2031-01-01" });
+    expect(input.deltas.get(2)).toEqual({ member_id: 2, delta_power: null, delta_position: null, since: null });
+  });
+
+  it("feeds buildRosterRows: observed row moves up, attendance null → unknown status", () => {
+    const rows = buildRosterRows({ ...captureRosterInput([captureRow({})]), attendance: null });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].deltaPower).toBe(10);
+    expect(rows[0].move).toBe(2); // delta_position -2 = moved up 2 places
+    expect(rows[0].status).toBe("unknown"); // renders as a dash
+  });
+});

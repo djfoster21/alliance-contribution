@@ -5,6 +5,8 @@ import type {
   ActivityType,
   Alias,
   Attendance,
+  CaptureRosterRow,
+  CaptureSummary,
   Event,
   EventListRow,
   Member,
@@ -176,6 +178,9 @@ export const api = {
     profile: (id: number) => get<MemberProfile>(`/members/${id}/profile`),
     captures: (date: string) =>
       get<{ captured_on: string; count: number; latest: string | null }>(`/members/captures/${date}`),
+    captureList: () => get<{ captures: CaptureSummary[] }>("/members/captures"),
+    captureRoster: (date: string) =>
+      get<{ rows: CaptureRosterRow[] }>(`/members/captures/${date}/roster`),
     deltas: () => get<MemberDelta[]>("/members/deltas"),
     snapshots: (id: number) => get<MemberSnapshotSeries>(`/members/${id}/snapshots`),
     create: (body: Partial<Member> & { governor: string }) => write<Member>("POST", "/members", body),
