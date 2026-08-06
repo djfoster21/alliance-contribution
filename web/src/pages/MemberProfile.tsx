@@ -17,7 +17,6 @@ import type {
   MemberProfile as MemberProfileData,
   MemberSnapshotSeries,
   OverallRanking,
-  WeeklyRanking,
 } from "@shared/types";
 import { api, ApiError, type ScoringConfig } from "@/lib/api";
 import { useApi, firstError } from "@/lib/useApi";
@@ -28,7 +27,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { AllianceRankBadge } from "@/components/AllianceRankBadge";
 import { PowerHistoryCard } from "@/components/PowerHistoryCard";
 import { StatCard } from "@/components/overview/StatCard";
-import { Movement } from "@/components/ranking-parts";
 import { LoadingState, ErrorState, EmptyState } from "@/components/States";
 import { activitySolidClass, activityFillVar } from "@/lib/activity";
 
@@ -175,9 +173,6 @@ export function MemberProfile() {
   const attendanceState = useApi<Attendance>(() => api.attendance(), []);
   const aliasesState = useApi<Alias[]>(() => api.aliases.list({ member_id: memberId }), [memberId]);
   const rankingState = useApi<OverallRanking>(() => api.rankings.overall(), []);
-  // Latest weekly board, only for its `movement` column — overall boards have no history, so this
-  // week's rank movement is the one honest movement signal we can put beside the overall rank.
-  const weeklyState = useApi<WeeklyRanking>(() => api.rankings.weekly(), []);
   // Same 404-is-an-answer handling as the profile fetch above: a bad member URL 404s BOTH endpoints,
   // and letting this one reach firstError would replace the "Member not found." copy with a raw error.
   const snapshotsState = useApi<MemberSnapshotSeries | null>(
@@ -198,7 +193,6 @@ export function MemberProfile() {
   const attendanceRow = attendanceState.data?.rows.find((r) => r.member_id === memberId);
   const rank = rankingState.data?.rows.find((r) => r.member_id === memberId)?.rank ?? null;
   const memberCount = rankingState.data?.rows.length ?? 0;
-  const weeklyRow = weeklyState.data?.rows.find((r) => r.member_id === memberId) ?? null;
   const aliases = aliasesState.data ?? [];
 
   const error = firstError(
@@ -207,7 +201,6 @@ export function MemberProfile() {
     attendanceState,
     aliasesState,
     rankingState,
-    weeklyState,
     snapshotsState,
   );
 
@@ -217,7 +210,6 @@ export function MemberProfile() {
     attendanceState.loading ||
     aliasesState.loading ||
     rankingState.loading ||
-    weeklyState.loading ||
     snapshotsState.loading
   ) {
     return <LoadingState />;
@@ -280,28 +272,10 @@ export function MemberProfile() {
             )}
           </div>
         </Card>
-        {/* Value = all-time rank; the weekly board's rank + movement live on their own labeled
-            line so the two boards never read as one number (a ↓17 beside an all-time #3 did). */}
         <StatCard
           label="Score Rank"
           value={rank !== null ? `#${rank}` : "—"}
-          sub={
-            rank !== null ? (
-              <div>
-                of {memberCount} members
-                {weeklyRow && (
-                  <div className="mt-0.5 flex items-center gap-1.5">
-                    this week <span className="num">#{weeklyRow.rank}</span>
-                    {weeklyRow.movement !== null && weeklyRow.movement !== 0 && (
-                      <Movement value={weeklyRow.movement} />
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              "not ranked yet"
-            )
-          }
+          sub={rank !== null ? `of ${memberCount} members` : "not ranked yet"}
         />
         <StatCard
           label="Total Score"
