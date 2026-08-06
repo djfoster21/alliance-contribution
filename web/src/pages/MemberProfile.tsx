@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -17,8 +17,9 @@ import type {
   MemberProfile as MemberProfileData,
   MemberSnapshotSeries,
   OverallRanking,
+  WeeklyRanking,
 } from "@shared/types";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type ScoringConfig } from "@/lib/api";
 import { useApi, firstError } from "@/lib/useApi";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,8 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar } from "@/components/ui/avatar";
 import { AllianceRankBadge } from "@/components/AllianceRankBadge";
 import { PowerHistoryCard } from "@/components/PowerHistoryCard";
+import { StatCard } from "@/components/overview/StatCard";
+import { Movement } from "@/components/ranking-parts";
 import { LoadingState, ErrorState, EmptyState } from "@/components/States";
 import { activitySolidClass, activityFillVar } from "@/lib/activity";
 
@@ -56,19 +59,6 @@ function barKey(activityKey: string): string {
   return `a:${activityKey}`;
 }
 
-/** A single stat card — mono uppercase label over a large tabular value. */
-function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub: React.ReactNode }) {
-  return (
-    <Card className="p-[18px]">
-      <div className="mb-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-faint">
-        {label}
-      </div>
-      <div className="num text-[26px] font-bold leading-none tracking-[-0.02em]">{value}</div>
-      <div className="mt-1.5 text-[11.5px] text-faint">{sub}</div>
-    </Card>
-  );
-}
-
 type CompTooltipProps = {
   active?: boolean;
   label?: string | number;
@@ -93,6 +83,78 @@ function CompTooltip({ active, payload, label }: CompTooltipProps) {
   );
 }
 
+/**
+ * One row in the "Score by activity" grid. Hovering fetches that activity's scoring config once
+ * (lazily — most rows are never hovered) and shows the tier table in a tooltip.
+ */
+function ActivityRow({
+  activity,
+  stat,
+  max,
+}: {
+  activity: ActivityType;
+  stat: { points: number; appearances: number };
+  max: number;
+}) {
+  const [config, setConfig] = useState<ScoringConfig | null>(null);
+  const requested = useRef(false);
+  const load = () => {
+    if (requested.current) return;
+    requested.current = true;
+    api.activityTypes
+      .getScoring(activity.id)
+      .then(setConfig)
+      .catch(() => {
+        requested.current = false; // tooltip is decoration — retry on next hover, never error the page
+      });
+  };
+  const tiers = config ? [...config.tiers].sort((a, b) => a.min_value - b.min_value) : [];
+
+  return (
+    <div className="group relative flex items-center gap-2.5" onMouseEnter={load}>
+      <span
+        className="size-2 shrink-0 rounded-full"
+        style={{ background: activityFillVar(activity.color) }}
+      />
+      <span className="min-w-0 truncate text-[13px] font-medium">{activity.name}</span>
+      <span className="num shrink-0 text-[11px] text-faint">×{stat.appearances}</span>
+      {activity.active === 0 && (
+        <span className="shrink-0 text-[11px] text-faint">inactive</span>
+      )}
+      <Progress
+        value={Math.round((stat.points / max) * 100)}
+        indicatorClassName={activitySolidClass(activity.color)}
+        className="h-2 min-w-14 flex-1 rounded-full bg-background"
+      />
+      <span className="num shrink-0 text-[13px] font-semibold">
+        {stat.points} <span className="text-[11px] font-normal text-faint">pts</span>
+      </span>
+
+      {config && (
+        <div className="pointer-events-none absolute bottom-full left-0 z-10 mb-1.5 hidden w-max rounded-[8px] border border-border bg-surface px-2.5 py-1.5 shadow-md group-hover:block">
+          <div className="mb-1 text-[11px] text-muted">
+            {activity.name} · weight ×{config.weight}
+          </div>
+          {tiers.length === 0 ? (
+            <div className="text-[12px] text-muted">No scoring tiers configured.</div>
+          ) : (
+            tiers.map((t) => (
+              <div key={t.min_value} className="flex items-baseline gap-3 text-[12px]">
+                <span className="num text-muted">
+                  ≥ {t.min_value.toLocaleString()} {activity.unit_label}
+                </span>
+                <span className="num ml-auto font-semibold text-foreground">
+                  {t.points} pt{t.points === 1 ? "" : "s"}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MemberProfile() {
   const { id } = useParams();
   const memberId = Number(id);
@@ -113,6 +175,9 @@ export function MemberProfile() {
   const attendanceState = useApi<Attendance>(() => api.attendance(), []);
   const aliasesState = useApi<Alias[]>(() => api.aliases.list({ member_id: memberId }), [memberId]);
   const rankingState = useApi<OverallRanking>(() => api.rankings.overall(), []);
+  // Latest weekly board, only for its `movement` column — overall boards have no history, so this
+  // week's rank movement is the one honest movement signal we can put beside the overall rank.
+  const weeklyState = useApi<WeeklyRanking>(() => api.rankings.weekly(), []);
   // Same 404-is-an-answer handling as the profile fetch above: a bad member URL 404s BOTH endpoints,
   // and letting this one reach firstError would replace the "Member not found." copy with a raw error.
   const snapshotsState = useApi<MemberSnapshotSeries | null>(
@@ -132,9 +197,19 @@ export function MemberProfile() {
   const profile = profileState.data;
   const attendanceRow = attendanceState.data?.rows.find((r) => r.member_id === memberId);
   const rank = rankingState.data?.rows.find((r) => r.member_id === memberId)?.rank ?? null;
+  const memberCount = rankingState.data?.rows.length ?? 0;
+  const weeklyRow = weeklyState.data?.rows.find((r) => r.member_id === memberId) ?? null;
   const aliases = aliasesState.data ?? [];
 
-  const error = firstError(profileState, activitiesState, attendanceState, aliasesState, rankingState, snapshotsState);
+  const error = firstError(
+    profileState,
+    activitiesState,
+    attendanceState,
+    aliasesState,
+    rankingState,
+    weeklyState,
+    snapshotsState,
+  );
 
   if (
     profileState.loading ||
@@ -142,6 +217,7 @@ export function MemberProfile() {
     attendanceState.loading ||
     aliasesState.loading ||
     rankingState.loading ||
+    weeklyState.loading ||
     snapshotsState.loading
   ) {
     return <LoadingState />;
@@ -167,6 +243,9 @@ export function MemberProfile() {
       : null;
   const scoredCount = activities.filter((a) => (perActivity[a.key]?.points ?? 0) > 0).length;
   const maxActivityPoints = Math.max(1, ...activities.map((a) => perActivity[a.key]?.points ?? 0));
+  const activitiesByPoints = [...activities].sort(
+    (a, b) => (perActivity[b.key]?.points ?? 0) - (perActivity[a.key]?.points ?? 0),
+  );
   const chartData = series.map((s) => ({
     label: weekLabel(s.week),
     ...Object.fromEntries(Object.entries(s.byActivity).map(([key, points]) => [barKey(key), points])),
@@ -176,62 +255,87 @@ export function MemberProfile() {
     <div className="flex flex-col gap-4">
       <BackLink />
 
-      {/* Hero */}
-      <Card className="flex flex-wrap items-start gap-[18px] p-[22px]">
-        <Avatar name={member.governor} size={72} tone="dark" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-[22px] font-bold tracking-[-0.01em]">{member.governor}</span>
-            <AllianceRankBadge rank={member.alliance_rank} />
-            <Badge variant="neutral">CANONICAL</Badge>
-            {member.active === 0 && <Badge variant="warn">Inactive</Badge>}
-          </div>
-          {aliases.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              <span className="text-[12px] text-muted">Known aliases:</span>
-              {aliases.map((a) => (
-                <span
-                  key={a.id}
-                  className="rounded-[6px] bg-foreground px-1.5 py-0.5 font-mono text-[11px] text-accent-foreground"
-                >
-                  {a.alias}
-                </span>
-              ))}
+      {/* Hero + KPI row */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-[1.7fr_1fr_1fr_1fr_1fr]">
+        <Card className="flex items-start gap-3.5 p-[18px] sm:col-span-2 xl:col-span-1">
+          <Avatar name={member.governor} size={48} tone="dark" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[18px] font-bold tracking-[-0.01em]">{member.governor}</span>
+              <AllianceRankBadge rank={member.alliance_rank} />
+              {member.active === 0 && <Badge variant="warn">Inactive</Badge>}
             </div>
-          )}
-        </div>
-        <div className="text-right">
-          <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-faint">
-            Score Rank
+            {aliases.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[12px] text-muted">Known aliases:</span>
+                {aliases.map((a) => (
+                  <span
+                    key={a.id}
+                    className="rounded-[6px] bg-foreground px-1.5 py-0.5 font-mono text-[11px] text-accent-foreground"
+                  >
+                    {a.alias}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="num text-[34px] font-bold leading-none tracking-[-0.02em]">
-            {rank !== null ? `#${rank}` : "—"}
-          </div>
-        </div>
-      </Card>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-        <Stat
+        </Card>
+        {/* Value = all-time rank; the weekly board's rank + movement live on their own labeled
+            line so the two boards never read as one number (a ↓17 beside an all-time #3 did). */}
+        <StatCard
+          label="Score Rank"
+          value={rank !== null ? `#${rank}` : "—"}
+          sub={
+            rank !== null ? (
+              <div>
+                of {memberCount} members
+                {weeklyRow && (
+                  <div className="mt-0.5 flex items-center gap-1.5">
+                    this week <span className="num">#{weeklyRow.rank}</span>
+                    {weeklyRow.movement !== null && weeklyRow.movement !== 0 && (
+                      <Movement value={weeklyRow.movement} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              "not ranked yet"
+            )
+          }
+        />
+        <StatCard
           label="Total Score"
           value={totals.score.toLocaleString()}
           sub={`across ${scoredCount} activit${scoredCount === 1 ? "y" : "ies"}`}
         />
-        <Stat
+        <StatCard
           label="Weekly Avg"
           value={weeklyAvg ?? "—"}
           sub={`last ${series.length} week${series.length === 1 ? "" : "s"}`}
         />
-        <Stat
+        <StatCard
           label="Attendance"
           value={attendancePct !== null ? `${attendancePct}%` : "—"}
-          sub={attendanceRow ? `${attendanceRow.attended}/${attendanceRow.total} event-days` : "no data"}
+          sub={
+            attendanceRow ? (
+              <div>
+                <Progress
+                  value={attendancePct ?? 0}
+                  className="mb-1.5 h-1.5 rounded-full bg-background"
+                />
+                <span className="num">{attendanceRow.attended}</span>/
+                <span className="num">{attendanceRow.total}</span> event-days
+              </div>
+            ) : (
+              "no data"
+            )
+          }
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Score composition */}
-        <Card className="p-5">
+        <Card className={snapshotsState.data ? "p-5" : "p-5 lg:col-span-2"}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <div className="text-[14px] font-semibold">Score composition</div>
@@ -285,44 +389,31 @@ export function MemberProfile() {
           )}
         </Card>
 
-        {/* Score by activity */}
-        <Card className="p-5">
-          <div className="mb-3.5 text-[14px] font-semibold">Score by activity</div>
-          {activities.map((activity) => {
-            const stat = perActivity[activity.key] ?? { points: 0, appearances: 0 };
-            const barW = Math.round((stat.points / maxActivityPoints) * 100);
-            return (
-              <div key={activity.id} className="mb-4 last:mb-0">
-                <div className="mb-1.5 flex items-baseline justify-between">
-                  <span className="flex items-center gap-1.5 text-[13px] font-medium">
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ background: activityFillVar(activity.color) }}
-                    />
-                    {activity.name}
-                    {activity.active === 0 && (
-                      <span className="text-[11px] font-normal text-faint">inactive</span>
-                    )}
-                  </span>
-                  <span className="num text-[13px] font-semibold">
-                    {stat.points} <span className="text-[11px] font-normal text-faint">pts</span>
-                  </span>
-                </div>
-                <Progress
-                  value={barW}
-                  indicatorClassName={activitySolidClass(activity.color)}
-                  className="h-2 rounded-full bg-background"
-                />
-                <div className="mt-1.5 text-[11px] text-faint">
-                  {stat.appearances} appearance{stat.appearances === 1 ? "" : "s"}
-                </div>
-              </div>
-            );
-          })}
-        </Card>
+        {/* Power & position */}
+        {snapshotsState.data && (
+          <PowerHistoryCard series={snapshotsState.data} totalMembers={memberCount} />
+        )}
       </div>
 
-      {snapshotsState.data && <PowerHistoryCard series={snapshotsState.data} />}
+      {/* Score by activity */}
+      <Card className="p-5">
+        <div className="mb-4">
+          <div className="text-[14px] font-semibold">Score by activity</div>
+          <div className="text-[12px] text-muted">
+            All-time totals · hover a row for scoring detail
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+          {activitiesByPoints.map((activity) => (
+            <ActivityRow
+              key={activity.id}
+              activity={activity}
+              stat={perActivity[activity.key] ?? { points: 0, appearances: 0 }}
+              max={maxActivityPoints}
+            />
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }

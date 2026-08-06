@@ -19,6 +19,11 @@ function dateLabel(d: string): string {
     : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+/** 64_200_000 -> "64.2M"; small values fall back to plain locale formatting. */
+function powerLabel(v: number): string {
+  return v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v.toLocaleString();
+}
+
 type Point = { label: string; power: number | null; position: number | null };
 
 type HistoryTooltipProps = {
@@ -66,7 +71,13 @@ function HistoryTooltip({ active, payload, label }: HistoryTooltipProps) {
  *
  * The position axis is reversed so #1 sits at the top, which is how the in-game board reads.
  */
-export function PowerHistoryCard({ series }: { series: MemberSnapshotSeries }) {
+export function PowerHistoryCard({
+  series,
+  totalMembers,
+}: {
+  series: MemberSnapshotSeries;
+  totalMembers?: number;
+}) {
   const data = useMemo<Point[]>(() => {
     const byDate = new Map(series.rows.map((r) => [r.captured_on, r]));
     return series.captures.map((d) => {
@@ -77,14 +88,29 @@ export function PowerHistoryCard({ series }: { series: MemberSnapshotSeries }) {
 
   const observed = data.filter((p) => p.power !== null || p.position !== null).length;
 
+  // Subtitle summary: capture count, date range, and the latest observed power/position. "now" is
+  // the last capture the member appeared in — a member absent from the newest paste keeps their
+  // most recent observed values rather than showing nothing.
+  const latest = [...data].reverse().find((p) => p.power !== null || p.position !== null);
+  const subtitle = [
+    `${observed} of ${series.captures.length} captures`,
+    data.length > 0 ? `${data[0].label} – ${data[data.length - 1].label}` : null,
+    latest?.power !== null && latest?.power !== undefined
+      ? `now ${powerLabel(latest.power)} power` +
+        (latest.position !== null
+          ? `, #${latest.position}${totalMembers ? ` of ${totalMembers}` : ""}`
+          : "")
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="text-[14px] font-semibold">Power &amp; position</div>
-          <div className="text-[12px] text-muted">
-            {observed} of {series.captures.length} captures observed
-          </div>
+          <div className="text-[12px] text-muted">{subtitle}</div>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-1.5 text-[11px] text-muted">
