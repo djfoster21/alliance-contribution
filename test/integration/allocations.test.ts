@@ -25,10 +25,14 @@ beforeAll(async () => {
   for (const stmt of SEED_STATEMENTS) {
     await DB.prepare(stmt).run();
   }
-  const { memberService, eventService } = createServices(DB);
-  for (const governor of ["Alloc_A", "Alloc_B", "Alloc_C"]) {
+  const { memberService, eventService, aliasService } = createServices(DB);
+  const a = await memberService.create({ governor: "Alloc_A", alliance_rank: "R4", power: 98_500_000 });
+  for (const governor of ["Alloc_B", "Alloc_C"]) {
     await memberService.create({ governor });
   }
+  // Two aliases; the LATER one is the member's "last alias" (created_at ties resolve by id).
+  await aliasService.add({ alias: "Alloc_A_Old", member_id: a.id });
+  await aliasService.add({ alias: "Alloc_A_New", member_id: a.id });
   // Contribution seed tiers: 20000 -> 1, 60000 -> 2, 120000 -> 3 points.
   weekA = (
     await eventService.create({
@@ -89,6 +93,11 @@ describe("POST /preview", () => {
     // Preview-only display context: attendance over the selected weeks (both attended weekA's
     // single event-day -> 1.0). Saved lines never carry it.
     expect(preview.lines.map((l) => l.attendance)).toEqual([1, 1]);
+    // Member display context joined onto every line: current alliance rank, power, last alias.
+    expect(preview.lines.map((l) => [l.alliance_rank, l.power, l.last_alias])).toEqual([
+      ["R4", 98_500_000, "Alloc_A_New"],
+      [null, null, null],
+    ]);
     expect(preview.warnings).toEqual([]);
 
     const list = await SELF.fetch(URL, { headers: ADMIN });
@@ -247,6 +256,10 @@ describe("POST / (create)", () => {
     expect(getRes.status).toBe(200);
     const fetched = (await getRes.json()) as AllocationWithLines;
     expect(fetched).toEqual(created);
+    // Saved lines read back with the member's CURRENT rank/power/last-alias joined on.
+    expect(fetched.lines[0].alliance_rank).toBe("R4");
+    expect(fetched.lines[0].power).toBe(98_500_000);
+    expect(fetched.lines[0].last_alias).toBe("Alloc_A_New");
 
     const list = await SELF.fetch(URL, { headers: ADMIN });
     const rows = (await list.json()) as AllocationWithLines[];

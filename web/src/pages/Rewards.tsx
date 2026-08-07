@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AllianceRankBadge } from "@/components/AllianceRankBadge";
 import { MEDALS } from "@/components/ranking-parts";
 import { EmptyState, ErrorState, LoadingState } from "@/components/States";
 
@@ -113,6 +114,9 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
+// 98,512,340 -> "98.5M" — the column is a magnitude cue, the exact value is on hover.
+const compactPower = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
 const TH = "sticky top-0 z-[2] border-b border-border bg-surface px-3.5 py-2.5 text-left font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-muted";
 const TD = "border-b border-border/50 px-3.5 py-2";
 
@@ -128,14 +132,18 @@ function LinesTable({ lines, metric }: { lines: AllocationWithLines["lines"]; me
         <colgroup>
           <col className="w-14" />
           <col />
+          <col className="w-16" />
+          <col className="w-[110px]" />
           {showAttendance && <col className="w-[88px]" />}
           <col className="w-[190px]" />
           <col className="w-20" />
         </colgroup>
         <thead>
           <tr>
-            <th className={TH}>Rank</th>
+            <th className={TH}>#</th>
             <th className={TH}>Member</th>
+            <th className={cn(TH, "px-2 text-center")}>Rank</th>
+            <th className={cn(TH, "text-right")}>Power</th>
             {showAttendance && <th className={cn(TH, "px-2 text-center")}>Att.</th>}
             <th className={cn(TH, "text-right")}>{metric === "points" ? "Score" : "Event-days"}</th>
             <th className={cn(TH, "pr-4 text-right")}>Amount</th>
@@ -157,8 +165,24 @@ function LinesTable({ lines, metric }: { lines: AllocationWithLines["lines"]; me
                       size={28}
                       style={medal ? { background: medal.bar, borderColor: medal.bar, color: "#fff" } : undefined}
                     />
-                    <span className="truncate text-[13.5px] font-semibold text-foreground">{l.governor}</span>
+                    <div className="flex min-w-0 flex-col leading-tight">
+                      <span className="truncate text-[13.5px] font-semibold text-foreground">{l.governor}</span>
+                      {l.last_alias && (
+                        <span className="truncate text-[11px] text-muted">aka {l.last_alias}</span>
+                      )}
+                    </div>
                   </div>
+                </td>
+                <td className={cn(TD, "px-2 text-center")}>
+                  <AllianceRankBadge rank={l.alliance_rank ?? null} />
+                </td>
+                <td className={cn(TD, "text-right")}>
+                  <span
+                    className="num text-[13px] text-secondary"
+                    title={l.power != null ? l.power.toLocaleString("en-US") : undefined}
+                  >
+                    {l.power != null ? compactPower.format(l.power) : "—"}
+                  </span>
                 </td>
                 {showAttendance && (
                   <td className={cn(TD, "px-2 text-center")}>

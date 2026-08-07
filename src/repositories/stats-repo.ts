@@ -1,5 +1,21 @@
 import { all, first } from "./db";
 
+// One reward-allocation metric row: the member's total plus current display context
+// (alliance_rank/power/last_alias ride along like governor — see AllocationLine).
+export type MetricTotalRow = {
+  member_id: number;
+  governor: string;
+  alliance_rank: string | null;
+  power: number | null;
+  last_alias: string | null;
+  value: number;
+};
+
+// Most recently saved alias (created_at DESC; same-second ties resolve by id) — SQLite datetime()
+// has 1-second granularity, so the id tiebreak is what keeps back-to-back inserts deterministic.
+const LAST_ALIAS_SQL =
+  "(SELECT alias FROM aliases WHERE member_id = m.id ORDER BY created_at DESC, id DESC LIMIT 1) AS last_alias";
+
 // All analytics SQL. Every aggregate ignores participations with member_id IS NULL (unmapped rows count
 // for nobody). Derived per-appearance scores live in participations.points — SUM them, never recompute.
 export class StatsRepo {
@@ -237,11 +253,12 @@ export class StatsRepo {
   // `weeks` omitted = no filter (all weeks). Zero-metric members are filtered in the domain, so an
   // INNER JOIN (participants only) is enough — no roster-seeded zero rows here. Selected weeks are a
   // subset of the real event weeks (~1/wk), far under D1's ~100-bound-parameter limit.
-  async scoreTotals(weeks?: string[]): Promise<{ member_id: number; governor: string; value: number }[]> {
+  // alliance_rank/power ride along as line display context (current values, like governor).
+  async scoreTotals(weeks?: string[]): Promise<MetricTotalRow[]> {
     const filter = weeks ? `AND e.week IN (${weeks.map(() => "?").join(", ")})` : "";
     return all(
       this.db,
-      `SELECT p.member_id, m.governor, SUM(p.points) AS value
+      `SELECT p.member_id, m.governor, m.alliance_rank, m.power, ${LAST_ALIAS_SQL}, SUM(p.points) AS value
        FROM participations p
        JOIN events e ON e.id = p.event_id
        JOIN members m ON m.id = p.member_id
@@ -253,11 +270,11 @@ export class StatsRepo {
 
   // scoreTotals' attendance twin: distinct event-days attended (same measure as the attendance board —
   // a member in either trap of a two-trap day counts once).
-  async eventDayTotals(weeks?: string[]): Promise<{ member_id: number; governor: string; value: number }[]> {
+  async eventDayTotals(weeks?: string[]): Promise<MetricTotalRow[]> {
     const filter = weeks ? `AND e.week IN (${weeks.map(() => "?").join(", ")})` : "";
     return all(
       this.db,
-      `SELECT p.member_id, m.governor, COUNT(DISTINCT e.activity_type_id || '|' || e.date) AS value
+      `SELECT p.member_id, m.governor, m.alliance_rank, m.power, ${LAST_ALIAS_SQL}, COUNT(DISTINCT e.activity_type_id || '|' || e.date) AS value
        FROM participations p
        JOIN events e ON e.id = p.event_id
        JOIN members m ON m.id = p.member_id

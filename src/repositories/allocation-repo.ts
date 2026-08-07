@@ -59,12 +59,15 @@ export class AllocationRepo {
     return row ? parseAllocation(row) : null;
   }
 
-  // Current governor joined in so history follows renames. Ordered by rank; a merge can leave two
-  // lines on one member (even two with the same rank never happens — ranks were distinct at save).
+  // Current member context (governor/alliance_rank/power/last saved alias) joined in so history
+  // follows renames. Ordered by rank; a merge can leave two lines on one member (even two with the
+  // same rank never happens — ranks were distinct at save).
   async lines(allocationId: number): Promise<AllocationLine[]> {
     return all(
       this.db,
-      `SELECT l.member_id, m.governor, l.rank, l.metric_value, l.amount
+      `SELECT l.member_id, m.governor, m.alliance_rank, m.power,
+              (SELECT alias FROM aliases WHERE member_id = m.id ORDER BY created_at DESC, id DESC LIMIT 1) AS last_alias,
+              l.rank, l.metric_value, l.amount
        FROM allocation_lines l
        JOIN members m ON m.id = l.member_id
        WHERE l.allocation_id = ?

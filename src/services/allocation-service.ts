@@ -126,10 +126,26 @@ export class AllocationService {
         ? await this.statsRepo.scoreTotals(filter)
         : await this.statsRepo.eventDayTotals(filter);
 
-    return computeAllocation(totals, input.quantity, input.strategy, {
+    const result = computeAllocation(totals, input.quantity, input.strategy, {
       tiers: input.tiers,
       topCount: input.topCount,
     });
+
+    // Fold the member display context (alliance_rank/power/last alias) the totals already carry
+    // onto the computed lines — the domain stays pure amounts. Every line member came from totals.
+    const meta = new Map(totals.map((t) => [t.member_id, t]));
+    return {
+      ...result,
+      lines: result.lines.map((l) => {
+        const m = meta.get(l.member_id);
+        return {
+          ...l,
+          alliance_rank: m?.alliance_rank ?? null,
+          power: m?.power ?? null,
+          last_alias: m?.last_alias ?? null,
+        };
+      }),
+    };
   }
 
   // Dedupe defensively; omit the SQL filter when every event week is selected (spec).

@@ -261,13 +261,17 @@ export type AllocationStrategy = "top_n" | "proportional" | "proportional_top" |
 /** One tiered-strategy band: ranks fromRank..toRank (1-based, inclusive) each get amountEach. */
 export type TierBand = { fromRank: number; toRank: number; amountEach: number };
 
-// A per-member amount, snapshotted at save time. `governor` is joined at read time (lines store
-// member_id so history follows renames); rank/metric_value/amount are frozen as computed.
-// `attendance` (0..1, over the selected weeks) is PREVIEW-ONLY display context — never stored,
-// absent on saved lines.
+// A per-member amount, snapshotted at save time. `governor`, `alliance_rank`, `power` and
+// `last_alias` (most recently saved alias) are the member's CURRENT values, joined/enriched at
+// read time (lines store member_id so history follows renames); rank/metric_value/amount are
+// frozen as computed. `attendance` (0..1, over the selected weeks) is PREVIEW-ONLY display
+// context — never stored, absent on saved lines.
 export type AllocationLine = {
   member_id: number;
   governor: string;
+  alliance_rank?: string | null;
+  power?: number | null;
+  last_alias?: string | null;
   rank: number;
   metric_value: number;
   amount: number;
