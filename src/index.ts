@@ -6,6 +6,7 @@ import { rateLimit } from "./middleware/rate-limit";
 import activityTypesRoutes from "./routes/activity-types";
 import adminRoutes from "./routes/admin";
 import aliasesRoutes from "./routes/aliases";
+import allocationsRoutes from "./routes/allocations";
 import analyticsRoutes from "./routes/analytics";
 import eventsRoutes from "./routes/events";
 import membersRoutes from "./routes/members";
@@ -23,6 +24,7 @@ app.get("/api/health", (c) => c.json({ ok: true }));
 app.get("/api/auth/me", (c) => c.json({ role: c.get("role") }));
 
 app.route("/api/activity-types", activityTypesRoutes);
+app.route("/api/admin/allocations", allocationsRoutes);
 app.route("/api/admin", adminRoutes);
 app.route("/api/aliases", aliasesRoutes);
 // Mounted at /api/ingests, not /api/events: ad blockers ship filter-list rules for `/api/event(s)`

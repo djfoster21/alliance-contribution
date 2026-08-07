@@ -26,6 +26,10 @@ function validFile(): BackupFile {
       member_snapshots: [{ id: 1, member_id: 1, captured_on: "2026-01-05", alliance_rank: null, power: null, power_position: null }],
       events: [{ id: 1, activity_type_id: 1, date: "2026-01-05", week: "2026-W01", instance: 1, created_at: "2026-01-01 00:00:00", updated_at: "2026-01-01 00:00:00" }],
       participations: [{ id: 1, event_id: 1, raw_name: "Alice\n[ABC]", member_id: 1, value: 5, points: 1, notes: null }],
+      allocations: [
+        { id: 1, title: "KvK chests", quantity: 2, metric: "points", weeks: '["2026-W01"]', strategy: "top_n", tiers: null, top_count: null, created_at: "2026-01-06 00:00:00" },
+      ],
+      allocation_lines: [{ id: 1, allocation_id: 1, member_id: 1, amount: 1, rank: 1, metric_value: 3 }],
     },
   };
 }
@@ -43,9 +47,10 @@ describe("buildBackup", () => {
 });
 
 describe("INSERT_ORDER", () => {
-  it("is the 7 tables in FK dependency order", () => {
+  it("is the 9 tables in FK dependency order", () => {
     expect(INSERT_ORDER).toEqual([
       "activity_types", "scoring_tiers", "members", "aliases", "member_snapshots", "events", "participations",
+      "allocations", "allocation_lines",
     ]);
   });
 });
@@ -122,6 +127,30 @@ describe("validateBackup", () => {
     if (!r.ok) expect(r.error).toMatch(/references missing/i);
   });
 
+  it("rejects an allocations row whose weeks or tiers column is not parseable JSON", () => {
+    for (const patch of [{ weeks: "2026-W30" }, { weeks: 42 }, { tiers: "{broken" }, { tiers: "1" }]) {
+      const f = validFile();
+      Object.assign(f.tables.allocations[0], patch);
+      const r = validateBackup(f);
+      expect(r.ok, JSON.stringify(patch)).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/weeks|tiers/);
+    }
+    // null tiers stays valid (non-tiered allocations store NULL).
+    const f = validFile();
+    f.tables.allocations[0].tiers = null;
+    expect(validateBackup(f).ok).toBe(true);
+  });
+
+  it("rejects an allocation line pointing at a missing allocation or member", () => {
+    for (const column of ["allocation_id", "member_id"]) {
+      const f = validFile();
+      f.tables.allocation_lines[0][column] = 999;
+      const r = validateBackup(f);
+      expect(r.ok, column).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/references missing/i);
+    }
+  });
+
   it("allows a null nullable FK (participation with unmapped member)", () => {
     const f = validFile();
     f.tables.participations[0].member_id = null;
@@ -171,7 +200,7 @@ describe("backup back-compat", () => {
     },
   });
 
-  it("upgrades a 0002 file's member columns and adds an empty member_snapshots", () => {
+  it("upgrades a 0002 file's member columns and adds the empty post-0002 tables", () => {
     const result = validateBackup(legacyFile("0002"));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -180,6 +209,33 @@ describe("backup back-compat", () => {
     });
     expect(result.file.tables.members[0]).not.toHaveProperty("role");
     expect(result.file.tables.member_snapshots).toEqual([]);
+    expect(result.file.tables.allocations).toEqual([]);
+    expect(result.file.tables.allocation_lines).toEqual([]);
+  });
+
+  it("upgrades a 0004 file by adding empty allocation tables, members untouched", () => {
+    const file = legacyFile("0004") as unknown as { tables: Record<string, unknown> };
+    file.tables.members = [{
+      id: 1, governor: "Alpha", alliance_rank: "R4", power: 100, power_position: 3,
+      active: 1, created_at: "2026-07-01 00:00:00", updated_at: "2026-07-01 00:00:00",
+    }];
+    file.tables.member_snapshots = [];
+    const result = validateBackup(file);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.file.tables.members[0]).toMatchObject({ governor: "Alpha", alliance_rank: "R4" });
+    expect(result.file.tables.allocations).toEqual([]);
+    expect(result.file.tables.allocation_lines).toEqual([]);
+  });
+
+  it("rejects a 0004 file that already carries an allocations key", () => {
+    const file = legacyFile("0004") as unknown as { tables: Record<string, unknown> };
+    file.tables.member_snapshots = [];
+    file.tables.allocations = [];
+    const result = validateBackup(file);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/allocations/);
   });
 
   it("upgrades a 0003 file the same way", () => {

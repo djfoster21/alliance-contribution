@@ -7,6 +7,7 @@ const TABS = [
   { to: "/admin/roster", label: "Roster" },
   { to: "/admin/aliases", label: "Aliases" },
   { to: "/admin/scoring", label: "Scoring & Activities" },
+  { to: "/admin/rewards", label: "Rewards", adminOnly: true },
   { to: "/admin/backup", label: "Export / Import", adminOnly: true },
 ];
 

@@ -233,6 +233,52 @@ export class StatsRepo {
     );
   }
 
+  // Reward-allocation metric totals (2026-08-07 spec): per active member over the selected weeks.
+  // `weeks` omitted = no filter (all weeks). Zero-metric members are filtered in the domain, so an
+  // INNER JOIN (participants only) is enough — no roster-seeded zero rows here. Selected weeks are a
+  // subset of the real event weeks (~1/wk), far under D1's ~100-bound-parameter limit.
+  async scoreTotals(weeks?: string[]): Promise<{ member_id: number; governor: string; value: number }[]> {
+    const filter = weeks ? `AND e.week IN (${weeks.map(() => "?").join(", ")})` : "";
+    return all(
+      this.db,
+      `SELECT p.member_id, m.governor, SUM(p.points) AS value
+       FROM participations p
+       JOIN events e ON e.id = p.event_id
+       JOIN members m ON m.id = p.member_id
+       WHERE p.member_id IS NOT NULL AND m.active = 1 ${filter}
+       GROUP BY p.member_id`,
+      ...(weeks ?? []),
+    );
+  }
+
+  // scoreTotals' attendance twin: distinct event-days attended (same measure as the attendance board —
+  // a member in either trap of a two-trap day counts once).
+  async eventDayTotals(weeks?: string[]): Promise<{ member_id: number; governor: string; value: number }[]> {
+    const filter = weeks ? `AND e.week IN (${weeks.map(() => "?").join(", ")})` : "";
+    return all(
+      this.db,
+      `SELECT p.member_id, m.governor, COUNT(DISTINCT e.activity_type_id || '|' || e.date) AS value
+       FROM participations p
+       JOIN events e ON e.id = p.event_id
+       JOIN members m ON m.id = p.member_id
+       WHERE p.member_id IS NOT NULL AND m.active = 1 ${filter}
+       GROUP BY p.member_id`,
+      ...(weeks ?? []),
+    );
+  }
+
+  // Total distinct event-days in the selected weeks — the attendance denominator for the reward
+  // preview's ATT. column. `weeks` omitted = all weeks (matches totalEventDays() unfiltered).
+  async totalEventDaysInWeeks(weeks?: string[]): Promise<number> {
+    const filter = weeks ? `WHERE week IN (${weeks.map(() => "?").join(", ")})` : "";
+    const row = await first<{ count: number }>(
+      this.db,
+      `SELECT COUNT(*) AS count FROM (SELECT DISTINCT activity_type_id, date FROM events ${filter})`,
+      ...(weeks ?? []),
+    );
+    return row?.count ?? 0;
+  }
+
   async memberCounts(): Promise<{ total: number; active: number }> {
     const row = await first<{ total: number; active: number }>(
       this.db,

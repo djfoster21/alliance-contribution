@@ -4,6 +4,10 @@
 import type {
   ActivityType,
   Alias,
+  Allocation,
+  AllocationInput,
+  AllocationPreview,
+  AllocationWithLines,
   Attendance,
   CaptureRosterRow,
   CaptureSummary,
@@ -225,6 +229,16 @@ export const api = {
     getScoring: (id: number) => get<ScoringConfig>(`/activity-types/${id}/scoring`),
     putScoring: (id: number, body: ScoringConfig) =>
       write<ScoringConfig>("PUT", `/activity-types/${id}/scoring`, body),
+  },
+
+  // Admin-key only (requireAdmin on every route).
+  allocations: {
+    preview: (input: AllocationInput) => write<AllocationPreview>("POST", "/admin/allocations/preview", input),
+    create: (input: AllocationInput) => write<AllocationWithLines>("POST", "/admin/allocations", input),
+    list: () => get<Allocation[]>("/admin/allocations"),
+    get: (id: number) => get<AllocationWithLines>(`/admin/allocations/${id}`),
+    updateTitle: (id: number, title: string) => write<Allocation>("PATCH", `/admin/allocations/${id}`, { title }),
+    delete: (id: number) => write<{ ok: true }>("DELETE", `/admin/allocations/${id}`),
   },
 
   admin: {

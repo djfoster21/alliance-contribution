@@ -37,7 +37,7 @@ function multiChunkFile(participationCount: number): BackupFile {
   return buildBackup(
     {
       activity_types: [], scoring_tiers: [], members: [], aliases: [], member_snapshots: [],
-      events: [], participations,
+      events: [], participations, allocations: [], allocation_lines: [],
     },
     "2026-11-16T00:00:00.000Z",
   );
@@ -60,7 +60,7 @@ describe("BackupRepo", () => {
     const repo = new BackupRepo(DB);
     const tables = await repo.dumpAll();
     expect(Object.keys(tables).sort()).toEqual(
-      ["activity_types", "aliases", "events", "member_snapshots", "members", "participations", "scoring_tiers"],
+      ["activity_types", "aliases", "allocation_lines", "allocations", "events", "member_snapshots", "members", "participations", "scoring_tiers"],
     );
     expect(tables.members.some((r) => r.governor === "RepoDumpMember")).toBe(true);
     expect(tables.participations.length).toBeGreaterThan(0);
@@ -119,6 +119,8 @@ describe("BackupRepo", () => {
     expect(counts.participations).toBe(700);
     expect(calls.length).toBeGreaterThan(2); // the wipe, then more than one insert chunk
     expect(calls[0]).toEqual([
+      "DELETE FROM allocation_lines",
+      "DELETE FROM allocations",
       "DELETE FROM participations",
       "DELETE FROM events",
       "DELETE FROM member_snapshots",
@@ -146,7 +148,7 @@ describe("BackupRepo", () => {
     const empty = buildBackup(
       {
         activity_types: [], scoring_tiers: [], members: [], aliases: [], member_snapshots: [],
-        events: [], participations: [],
+        events: [], participations: [], allocations: [], allocation_lines: [],
       },
       "2026-11-02T00:00:00.000Z",
     );
@@ -175,6 +177,8 @@ describe("BackupRepo", () => {
         member_snapshots: [],
         events: [],
         participations: [],
+        allocations: [],
+        allocation_lines: [],
       },
       "2026-11-16T00:00:00.000Z",
     );

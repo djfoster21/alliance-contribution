@@ -21,6 +21,7 @@ const Roster = lazy(() => import("@/pages/Roster").then((m) => ({ default: m.Ros
 const Aliases = lazy(() => import("@/pages/Aliases").then((m) => ({ default: m.Aliases })));
 const Scoring = lazy(() => import("@/pages/Scoring").then((m) => ({ default: m.Scoring })));
 const Backup = lazy(() => import("@/pages/Backup").then((m) => ({ default: m.Backup })));
+const Rewards = lazy(() => import("@/pages/Rewards").then((m) => ({ default: m.Rewards })));
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="roster" element={<Roster />} />
                 <Route path="aliases" element={<Aliases />} />
                 <Route path="scoring" element={<Scoring />} />
+                <Route path="rewards" element={<Rewards />} />
                 <Route path="backup" element={<Backup />} />
               </Route>
               <Route path="*" element={<Placeholder title="Not found" />} />

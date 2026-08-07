@@ -253,6 +253,54 @@ export type CaptureRosterRow = {
   since: string | null;          // baseline capture date, null = first observation
 };
 
+// ---- Reward allocations (2026-08-07 spec) -----------------------------------
+
+export type AllocationMetric = "points" | "attendance";
+export type AllocationStrategy = "top_n" | "proportional" | "proportional_top" | "tiered";
+
+/** One tiered-strategy band: ranks fromRank..toRank (1-based, inclusive) each get amountEach. */
+export type TierBand = { fromRank: number; toRank: number; amountEach: number };
+
+// A per-member amount, snapshotted at save time. `governor` is joined at read time (lines store
+// member_id so history follows renames); rank/metric_value/amount are frozen as computed.
+// `attendance` (0..1, over the selected weeks) is PREVIEW-ONLY display context — never stored,
+// absent on saved lines.
+export type AllocationLine = {
+  member_id: number;
+  governor: string;
+  rank: number;
+  metric_value: number;
+  amount: number;
+  attendance?: number;
+};
+
+export type Allocation = {
+  id: number;
+  title: string;
+  quantity: number;
+  metric: AllocationMetric;
+  weeks: string[]; // the selected event weeks, auditable later
+  strategy: AllocationStrategy;
+  tiers: TierBand[] | null; // null unless strategy = tiered
+  top_count: number | null; // null unless strategy = proportional_top
+  created_at: string;
+};
+
+export type AllocationWithLines = Allocation & { lines: AllocationLine[] };
+
+/** Preview/create request body. `title` is required on create only. */
+export type AllocationInput = {
+  title?: string;
+  quantity: number;
+  metric: AllocationMetric;
+  weeks: string[];
+  strategy: AllocationStrategy;
+  tiers?: TierBand[];
+  topCount?: number;
+};
+
+export type AllocationPreview = { lines: AllocationLine[]; warnings: string[] };
+
 // Worker bindings.
 export type Env = {
   DB: D1Database;

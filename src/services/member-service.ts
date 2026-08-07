@@ -12,6 +12,7 @@ import type {
 import { normalizeName } from "../domain/resolve";
 import { computeDelta, computeMemberDeltas } from "../domain/roster-delta";
 import type { AliasRepo } from "../repositories/alias-repo";
+import type { AllocationRepo } from "../repositories/allocation-repo";
 import type { MemberRepo } from "../repositories/member-repo";
 import type { SnapshotRepo } from "../repositories/snapshot-repo";
 import type { RecomputeService } from "./recompute-service";
@@ -43,6 +44,7 @@ export class MemberService {
     private readonly memberRepo: MemberRepo,
     private readonly aliasRepo: AliasRepo,
     private readonly snapshotRepo: SnapshotRepo,
+    private readonly allocationRepo: AllocationRepo,
     private readonly recompute: RecomputeService,
   ) {}
 
@@ -247,6 +249,10 @@ export class MemberService {
 
     const movedAliases = await this.aliasRepo.reassignMember(sourceId, targetId);
     await this.snapshotRepo.moveMember(sourceId, targetId);
+    // Saved reward-allocation lines follow the surviving identity (member_id only — amount, rank and
+    // metric_value stay frozen). Must land before the source delete below: the lines' FK has no ON
+    // DELETE clause, so a still-pointing line would block it.
+    await this.allocationRepo.reassignMember(sourceId, targetId);
 
     // Recompute BEFORE deleting the source: participations.member_id has no ON DELETE clause, so the
     // delete is FK-blocked while any row still points at the source. The names all resolve to the
