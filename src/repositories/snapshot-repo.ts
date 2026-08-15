@@ -1,5 +1,5 @@
 import type { CaptureSummary, MemberSnapshot, NewMemberSnapshot } from "../../shared/types";
-import { all, batchChunked, buildMultiRowInsert, first } from "./db";
+import { all, batchChunked, buildMultiRowInsert, first, run } from "./db";
 
 const COLUMNS = ["member_id", "captured_on", "alliance_rank", "power", "power_position"];
 
@@ -37,6 +37,13 @@ export class SnapshotRepo {
         .bind(from, to),
       this.db.prepare("UPDATE member_snapshots SET member_id = ?2 WHERE member_id = ?1").bind(from, to),
     ]);
+  }
+
+  // Drop one capture date wholesale — the roster page's "Delete update". Rows deleted, so the caller can 404
+  // on an empty date instead of reporting success for nothing.
+  async deleteForDate(captured_on: string): Promise<number> {
+    const result = await run(this.db, "DELETE FROM member_snapshots WHERE captured_on = ?", captured_on);
+    return result.meta.changes;
   }
 
   async countForDate(captured_on: string): Promise<number> {

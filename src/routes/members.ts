@@ -82,6 +82,21 @@ membersRoutes.get("/captures/:date", async (c) => {
   }
 });
 
+// Delete one capture wholesale — the roster page's "Delete update". Admin like /import, the only other
+// snapshot write. 404 when the date holds nothing; malformed date → 400 via statusForError.
+membersRoutes.delete("/captures/:date", requireAdmin, async (c) => {
+  const { memberService } = createServices(c.env.DB);
+
+  try {
+    const deleted = await memberService.deleteCapture(c.req.param("date"));
+    if (!deleted) return c.json({ error: "no capture on that date" }, 404);
+    return c.json({ ok: true });
+  } catch (err) {
+    const message = (err as Error).message;
+    return c.json({ error: message }, statusForError(message));
+  }
+});
+
 // The roster as observed on one capture date (see MemberService.rosterForDate). 404 when the date
 // has no snapshot rows — unlike the sibling count endpoint, where zero is a real answer, an as-of
 // view of nothing is not. Malformed date → 400 via statusForError.

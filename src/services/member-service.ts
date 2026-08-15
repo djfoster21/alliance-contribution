@@ -102,6 +102,14 @@ export class MemberService {
     return this.snapshotRepo.countForDate(captured_on);
   }
 
+  // Delete one capture date. False when the date held nothing (route → 404). Deliberately does NOT roll
+  // `members.*` back to the previous capture — current meta stays as last imported until the next import
+  // or an edit of the new latest capture writes it again. No recompute: snapshots do not feed scoring.
+  async deleteCapture(captured_on: string): Promise<boolean> {
+    if (!isCalendarDate(captured_on)) throw new Error(`Invalid captured_on: must be YYYY-MM-DD`);
+    return (await this.snapshotRepo.deleteForDate(captured_on)) > 0;
+  }
+
   // The newest capture on record — the wizard compares its chosen date against this to know it is
   // backfilling before it offers the membership step.
   async latestCapture(): Promise<string | null> {

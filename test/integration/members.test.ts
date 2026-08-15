@@ -1216,6 +1216,33 @@ describe("members HTTP routes", () => {
     expect(res.status).toBe(200);
   });
 
+  it("DELETE /captures/:date removes one capture — admin only, 404 when empty, 400 malformed", async () => {
+    const { memberService } = createServices(DB);
+    const m = await memberService.create({ governor: "CaptureDel_Ann" });
+    const repo = new SnapshotRepo(DB);
+    await repo.replaceForDate("2024-05-01", [
+      { member_id: m.id, captured_on: "2024-05-01", alliance_rank: "R2", power: 10, power_position: 1 },
+    ]);
+    await repo.replaceForDate("2024-05-08", [
+      { member_id: m.id, captured_on: "2024-05-08", alliance_rank: "R2", power: 11, power_position: 1 },
+    ]);
+
+    const url = "https://example.com/api/members/captures/2024-05-01";
+    expect((await SELF.fetch(url, { method: "DELETE" })).status).toBe(401);
+    expect((await SELF.fetch(url, { method: "DELETE", headers: AUTH })).status).toBe(403);
+
+    const ok = await SELF.fetch(url, { method: "DELETE", headers: ADMIN_AUTH });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ ok: true });
+    expect(await repo.countForDate("2024-05-01")).toBe(0);
+    expect(await repo.countForDate("2024-05-08")).toBe(1);
+
+    expect((await SELF.fetch(url, { method: "DELETE", headers: ADMIN_AUTH })).status).toBe(404);
+    expect(
+      (await SELF.fetch("https://example.com/api/members/captures/25-12-2026", { method: "DELETE", headers: ADMIN_AUTH })).status,
+    ).toBe(400);
+  });
+
   it("reports the newest capture on record alongside the count", async () => {
     // 2028-03-01, not the plan's 2027-02-07: an earlier test in this file ("rejects a well-shaped
     // but impossible calendar date") already writes a 2028-02-29 capture into the shared DB, so a

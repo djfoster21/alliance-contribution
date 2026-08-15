@@ -197,6 +197,7 @@ export const api = {
     // merge :id (the duplicate) into another member — admin only, deletes the source
     merge: (id: number, into: number) => write<MergeResult>("POST", `/members/${id}/merge`, { into }),
     import: (batch: RosterImportBatch) => write<RosterImportResult>("POST", "/members/import", batch),
+    deleteCapture: (date: string) => write<{ ok: true }>("DELETE", `/members/captures/${date}`),
   },
 
   aliases: {
