@@ -118,6 +118,19 @@ export function parseRoster(text: string): RosterParseResult {
   return { rows, noGovernor, invalid };
 }
 
+/**
+ * Inverse of `parseRoster` for prefilling the wizard from a stored capture: one line per row,
+ * `Governor<TAB>Rank<TAB>Power<TAB>Position`, null cells empty. Power is written without separators —
+ * `parseNumCell` strips them anyway, and a bare integer never trips its digit-only check.
+ */
+export function serializeRoster(
+  rows: { governor: string; alliance_rank: string | null; power: number | null; power_position: number | null }[],
+): string {
+  return rows
+    .map((r) => [r.governor, r.alliance_rank ?? "", r.power ?? "", r.power_position ?? ""].join("\t"))
+    .join("\n");
+}
+
 /** Structural — see the file header. Mirrors the fields of shared Member / Alias that matter here. */
 export type MemberLike = { id: number; governor: string; active: number };
 export type AliasLike = { alias: string; member_id: number };

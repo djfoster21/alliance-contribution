@@ -5,6 +5,7 @@ import {
   metaFields,
   parseNumCell,
   parseRoster,
+  serializeRoster,
   type AliasLike,
   type MemberLike,
 } from "../../web/src/lib/roster-paste";
@@ -307,5 +308,19 @@ describe("parseNumCell", () => {
     expect(parseNumCell("  ")).toBeNull();
     expect(parseNumCell("164,497,800")).toBe(164497800);
     expect(parseNumCell("0")).toBe(0);
+  });
+});
+
+describe("serializeRoster", () => {
+  it("round-trips through parseRoster, empty cells included", () => {
+    const rows = [
+      { governor: "Aurora", alliance_rank: "R4", power: 164497800, power_position: 1 },
+      { governor: "Blaze", alliance_rank: null, power: null, power_position: 7 },
+      { governor: "Cinder", alliance_rank: "R1", power: 0, power_position: null },
+    ];
+    const out = parseRoster(serializeRoster(rows));
+    expect(out.invalid).toEqual([]);
+    expect(out.noGovernor).toBe(0);
+    expect(out.rows.map(({ line: _l, ...r }) => r)).toEqual(rows);
   });
 });
