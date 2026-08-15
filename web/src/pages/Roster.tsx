@@ -9,6 +9,7 @@ import {
   UserCheck,
   CalendarDays,
   CheckCircle2,
+  Trash2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
@@ -60,6 +61,7 @@ import {
   metaFields,
   parseNumCell,
   parseRoster,
+  serializeRoster,
   type ParsedRosterRow,
 } from "@/lib/roster-paste";
 import { MemberSearchSelect } from "@/components/member-search-select";
@@ -810,10 +812,14 @@ function ImportRosterDialog({
   open,
   onOpenChange,
   onApplied,
+  initial,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onApplied: () => void;
+  /** Edit mode: prefill from a stored capture. The date is locked (moving a capture would leave the
+   *  original behind) and the overwrite acknowledgement is implied — replacing that date is the point. */
+  initial: { capturedOn: string; text: string } | null;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [text, setText] = useState("");
@@ -849,8 +855,8 @@ function ImportRosterDialog({
     if (!open) return;
     let cancelled = false;
     setStep(1);
-    setText("");
-    setCapturedOn(todayIso());
+    setText(initial?.text ?? "");
+    setCapturedOn(initial?.capturedOn ?? todayIso());
     setDecisions({});
     setDeactivateIds({});
     setReactivateIds({});
@@ -874,6 +880,8 @@ function ImportRosterDialog({
     return () => {
       cancelled = true;
     };
+    // `initial` is set by the caller before opening and does not change while open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // How many snapshots the chosen date already holds. Re-importing a short paste over a full
@@ -982,7 +990,8 @@ function ImportRosterDialog({
   const unrecognizedCount = classified.unrecognized.length;
   const nothingToImport = parsed.rows.length === 0;
   const dateValid = DATE_RE.test(capturedOn);
-  const needsOverwriteAck = ((existingCount ?? 0) > 0 || captureCheckFailed) && !overwriteAck;
+  const needsOverwriteAck =
+    initial === null && ((existingCount ?? 0) > 0 || captureCheckFailed) && !overwriteAck;
   // A capture older than the newest on record is a BACKFILL: it adds history but says nothing about
   // today's membership, and the server rejects deactivations/reactivations that arrive with it.
   const backdated = latestCapture != null && capturedOn < latestCapture;
@@ -1070,7 +1079,7 @@ function ImportRosterDialog({
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Import roster (TSV)
+            {initial ? "Edit roster update" : "Import roster (TSV)"}
             {!result && !dataError && (
               <span className="font-normal text-muted"> — step {step} of 3</span>
             )}
@@ -1122,8 +1131,14 @@ function ImportRosterDialog({
                 The day this Alliance Ranking screen was captured. Rank and power are recorded
                 against it, so the next import can report what changed.
               </p>
-              <DatePicker value={capturedOn} onChange={setCapturedOn} className="w-56" />
-              {!dateValid && <p className="text-[12px] text-down">Pick a valid date (YYYY-MM-DD).</p>}
+              {initial ? (
+                <span className="num text-[13px] font-medium">{capturedOn}</span>
+              ) : (
+                <>
+                  <DatePicker value={capturedOn} onChange={setCapturedOn} className="w-56" />
+                  {!dateValid && <p className="text-[12px] text-down">Pick a valid date (YYYY-MM-DD).</p>}
+                </>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -1226,9 +1241,11 @@ function ImportRosterDialog({
                     . Importing replaces that date wholesale — members not in this paste lose their
                     observation for it.
                   </div>
-                  <Checkbox checked={overwriteAck} onChange={setOverwriteAck}>
-                    <span className="text-warn">Replace the existing capture for {capturedOn}</span>
-                  </Checkbox>
+                  {initial === null && (
+                    <Checkbox checked={overwriteAck} onChange={setOverwriteAck}>
+                      <span className="text-warn">Replace the existing capture for {capturedOn}</span>
+                    </Checkbox>
+                  )}
                 </AlertContent>
               </Alert>
             )}
@@ -1578,6 +1595,73 @@ function ImportRosterDialog({
   );
 }
 
+/** Mirrors Events' DeleteEventDialog. Removes one capture date's snapshot rows; `members.*` keep their
+ *  last-imported values (spec: not rolled back). */
+function DeleteCaptureDialog({
+  date,
+  count,
+  onCancel,
+  onDeleted,
+}: {
+  date: string | null;
+  count: number;
+  onCancel: () => void;
+  onDeleted: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (date) {
+      setSubmitting(false);
+      setError(null);
+    }
+  }, [date]);
+
+  const confirm = async () => {
+    if (!date) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.members.deleteCapture(date);
+      onDeleted();
+    } catch (e) {
+      setError(writeErrorMessage(e));
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={date !== null}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete roster update</DialogTitle>
+          <DialogDescription>
+            Delete the <span className="num">{date && fmtCaptureDate(date)}</span> capture (
+            <span className="num">{count}</span> member{count === 1 ? "" : "s"})? Each member's Rank/Power/
+            Position on the roster keep their current values — only this date's history is removed. This
+            can't be undone.
+          </DialogDescription>
+        </DialogHeader>
+        {error && <ErrorState message={error} />}
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button variant="danger" size="sm" onClick={confirm} disabled={submitting}>
+            {submitting ? "Deleting…" : "Delete update"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function Roster() {
   const { role } = useApiKey();
   const [filter, setFilter] = useState<Filter>("active");
@@ -1675,6 +1759,8 @@ export function Roster() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [importInitial, setImportInitial] = useState<{ capturedOn: string; text: string } | null>(null);
+  const [deleteDate, setDeleteDate] = useState<string | null>(null);
   const [editMember, setEditMember] = useState<Member | null>(null);
   const [renameMember, setRenameMember] = useState<Member | null>(null);
   const [mergeMember, setMergeMember] = useState<Member | null>(null);
@@ -1683,6 +1769,21 @@ export function Roster() {
   const [note, setNote] = useState<string | null>(null);
 
   const refresh = () => setReloadKey((k) => k + 1);
+
+  // The capture the admin is looking at: the selected date, or the latest in live mode.
+  const shownCapture = viewDate ?? latestCaptureDate;
+
+  const editCapture = async () => {
+    if (!shownCapture) return;
+    setRowError(null);
+    try {
+      const { rows } = await api.members.captureRoster(shownCapture);
+      setImportInitial({ capturedOn: shownCapture, text: serializeRoster(rows) });
+      setImportOpen(true);
+    } catch (e) {
+      setRowError(writeErrorMessage(e));
+    }
+  };
 
   const activate = async (m: Member) => {
     setRowError(null);
@@ -1752,8 +1853,27 @@ export function Roster() {
                 </SelectContent>
               </Select>
             )}
+            {role === "admin" && shownCapture && (
+              <>
+                <Button variant="secondary" size="sm" onClick={editCapture}>
+                  <Pencil />
+                  Edit update
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setDeleteDate(shownCapture)}>
+                  <Trash2 />
+                  Delete update
+                </Button>
+              </>
+            )}
             {role === "admin" && (
-              <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setImportInitial(null);
+                  setImportOpen(true);
+                }}
+              >
                 <Upload />
                 Import roster (TSV)
               </Button>
@@ -1969,9 +2089,24 @@ export function Roster() {
       <ImportRosterDialog
         open={importOpen}
         onOpenChange={setImportOpen}
+        initial={importInitial}
         onApplied={() => {
-          setNote("Roster imported — scores recomputed.");
-          setViewDate(null); // the operator just imported today; a stale historical view would hide it
+          setNote(importInitial ? "Roster update saved." : "Roster imported — scores recomputed.");
+          // A fresh import lands on the live view; an edited backdated capture stays in view.
+          setViewDate(
+            importInitial && importInitial.capturedOn !== latestCaptureDate ? importInitial.capturedOn : null,
+          );
+          refresh();
+        }}
+      />
+      <DeleteCaptureDialog
+        date={deleteDate}
+        count={captures.find((c) => c.captured_on === deleteDate)?.members ?? 0}
+        onCancel={() => setDeleteDate(null)}
+        onDeleted={() => {
+          setDeleteDate(null);
+          setNote(`Deleted the ${deleteDate ? fmtCaptureDate(deleteDate) : ""} roster update.`);
+          setViewDate(null);
           refresh();
         }}
       />
