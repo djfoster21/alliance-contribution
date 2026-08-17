@@ -14,7 +14,7 @@ It replaces the spreadsheet most alliances end up maintaining by hand.
   Contribution and Mobilization are tiered on the raw value, with Mobilization weighted ×2.
   Tiers and weights are editable at runtime through the Scoring admin page.
 - **Ingests events by paste.** The app never uploads images or calls an LLM. You paste your
-  screenshots into an LLM chat with the prompt from `docs/specs/07_llm_ingestion.md`, and paste the
+  screenshots into an LLM chat with the prompt the Add Event dialog gives you (see [Events](docs/guides/events.md)), and paste the
   tab-separated rows it returns into the Add Event dialog. Ingest is idempotent — re-pasting the same
   event updates rather than duplicates.
 - **Resolves names through an alias table only, never fuzzy matching.** Alliances run deliberate decoy
@@ -45,7 +45,7 @@ Worker/SPA boundary in `shared/`.
 
 ## Requirements
 
-- Node 22 (the version CI uses; there is no `engines` pin)
+- Node 22 or newer (`engines` in `package.json`; CI runs 22)
 - A Cloudflare account — free tier is enough
 - Wrangler is installed as a dev dependency; no global install needed
 
@@ -104,7 +104,9 @@ copies the template before running.
 
 ## Deploy
 
-Set your production secrets once (these are separate from `.dev.vars`, which is local-only):
+Set your production secrets once (these are separate from `.dev.vars`, which is local-only). Use long
+random values — e.g. `openssl rand -base64 32` — since `GET /api/auth/me` tells any caller which tier a
+key resolves to:
 
 ```bash
 npx wrangler secret put ADMIN_API_KEY
@@ -156,11 +158,17 @@ public; it holds no data, and the key gate renders before any fetch resolves.
 
 ## Documentation
 
-- `docs/specs/00_overview.md` — vision, data model, service architecture, and the index of phase specs
-- `docs/specs/07_llm_ingestion.md` — the screenshot → LLM → paste ingestion contract
-- `docs/data/runbook.md` — scoring and alias rules in detail, including the gotchas
-- `docs/data/roster.md`, `docs/data/aliases.md` — example roster and alias data (fictional)
-- `CLAUDE.md` — conventions and non-obvious decisions, for both humans and coding agents
+User guides, one per section of the app, live in [`docs/guides/`](docs/guides/):
+
+- [Overview](docs/guides/overview.md) — how the pieces fit together, the dashboard
+- [Ranking](docs/guides/ranking.md) · [Attendance](docs/guides/attendance.md) · [Members](docs/guides/members.md)
+- Admin: [Events](docs/guides/events.md) (screenshot → LLM → paste ingestion) · [Roster](docs/guides/roster.md) ·
+  [Aliases](docs/guides/aliases.md) · [Scoring](docs/guides/scoring.md) · [Rewards](docs/guides/rewards.md) ·
+  [Backup](docs/guides/backup.md)
+
+`CLAUDE.md` holds conventions and non-obvious decisions for humans and coding agents. The rest of `docs/`
+(`data/`, `fixtures/`, `plans/`, `specs/`) is gitignored — one deployment's real roster and alias data plus
+design notes — and is not needed to build or run the app.
 
 ## License
 

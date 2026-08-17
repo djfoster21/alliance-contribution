@@ -13,6 +13,8 @@ import type { RecomputeService } from "./recompute-service";
 import type { ResolveService } from "./resolve-service";
 
 export type IngestRow = { raw_name: string; value: number; notes?: string | null };
+const MAX_INGEST_ROWS = 500;
+
 export type IngestDto = { activity: string; date: string; instance?: number; rows: IngestRow[] };
 
 // A participation joined to its resolved member's governor (NULL when unmapped).
@@ -154,6 +156,9 @@ export class EventService {
     excludeEventId: number | null,
     materializeEvent: () => Promise<Event>,
   ): Promise<IngestResult> {
+    // ponytail: hard cap on paste size; a ranking screen is <100 rows, so anything larger is a mistake or abuse.
+    if (rows.length > MAX_INGEST_ROWS) throw new Error(`too many rows: ${rows.length} (max ${MAX_INGEST_ROWS})`);
+
     const resolver = await this.resolveService.buildResolver();
 
     const skipped: { raw_name: string; value: number }[] = [];

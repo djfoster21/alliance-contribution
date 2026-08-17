@@ -7,6 +7,9 @@ import { createServices } from "../services";
 
 // Admin escape hatch. apiKeyAuth gates all of /api/admin/* (including GET) with X-Api-Key; the destructive
 // export/import routes additionally require requireAdmin (admin tier only).
+// ponytail: 10 MB import ceiling; raise if a real backup ever approaches it.
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+
 const adminRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 // Manual full re-resolve + re-score. There is no view cache to refresh — reads are current on commit.
@@ -36,7 +39,10 @@ adminRoutes.get("/export", requireAdmin, async (c) => {
 adminRoutes.post("/import", requireAdmin, async (c) => {
   const { backupService } = createServices(c.env.DB);
 
+  const length = Number(c.req.header("content-length") ?? 0);
+  if (length > MAX_IMPORT_BYTES) return c.json({ error: "backup too large" }, 413);
   const text = await c.req.text();
+  if (text.length > MAX_IMPORT_BYTES) return c.json({ error: "backup too large" }, 413);
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -47,8 +53,9 @@ adminRoutes.post("/import", requireAdmin, async (c) => {
   try {
     return c.json(await backupService.import(parsed));
   } catch (err) {
-    const status = err instanceof BackupValidationError ? 400 : 500;
-    return c.json({ error: (err as Error).message }, status);
+    if (err instanceof BackupValidationError) return c.json({ error: err.message }, 400);
+    console.error("import failed", err);
+    return c.json({ error: "import failed" }, 500);
   }
 });
 

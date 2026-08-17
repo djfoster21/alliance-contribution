@@ -1,3 +1,5 @@
+# Local-only secrets for `wrangler dev`. Any values work locally; for production use long random
+# values (e.g. `openssl rand -base64 32`) and set them with `wrangler secret put`.
 API_KEY=dev-key
 ADMIN_API_KEY=dev-admin-key
 VIEWER_API_KEY=dev-viewer-key

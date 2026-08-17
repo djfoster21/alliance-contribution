@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { secureHeaders } from "hono/secure-headers";
 import type { Env } from "../shared/types";
 import type { AuthVariables } from "./middleware/auth";
 import { apiKeyAuth } from "./middleware/auth";
@@ -15,6 +16,7 @@ import unmappedRoutes from "./routes/unmapped";
 
 const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
+app.use("*", secureHeaders());
 app.use("/api/*", rateLimit);
 app.use("/api/*", apiKeyAuth);
 

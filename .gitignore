@@ -1,7 +1,3 @@
-/docs/fixtures/beartrap_2026-07-13_trap1.tsv
-/docs/fixtures/castlebattle_bbc_2026-07-18.tsv
-/docs/fixtures
-
 node_modules
 dist/*
 !dist/.gitkeep
@@ -11,4 +7,10 @@ dist/*
 wrangler.toml
 seed/out
 .serena/
-docs/
+.DS_Store
+# Operator-private domain data (real roster/aliases, raw ranking TSVs) and dev planning notes.
+# docs/guides/ is the published documentation.
+docs/data/
+docs/fixtures/
+docs/plans/
+docs/specs/

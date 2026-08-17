@@ -13,10 +13,10 @@ activityTypesRoutes.get("/", async (c) => {
 });
 
 activityTypesRoutes.post("/", async (c) => {
-  const body = await c.req.json();
   const { activityService } = createServices(c.env.DB);
 
   try {
+    const body = await c.req.json();
     return c.json(await activityService.create(body), 201);
   } catch (err) {
     const message = (err as Error).message;
@@ -40,10 +40,10 @@ activityTypesRoutes.patch("/:id", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "invalid id" }, 400);
 
-  const body = await c.req.json();
   const { activityService } = createServices(c.env.DB);
 
   try {
+    const body = await c.req.json();
     const updated = await activityService.update(id, body);
     if (!updated) return c.json({ error: "activity type not found" }, 404);
     return c.json(updated);
@@ -69,10 +69,11 @@ activityTypesRoutes.put("/:id/scoring", async (c) => {
   const id = Number(c.req.param("id"));
   if (Number.isNaN(id)) return c.json({ error: "invalid id" }, 400);
 
-  const body = await c.req.json<{ weight: number; tiers: { min_value: number; points: number }[] }>();
   const { scoringService } = createServices(c.env.DB);
 
   try {
+    const body = await c.req.json<{ weight: number; tiers: { min_value: number; points: number }[] }>();
+    if (!Array.isArray(body?.tiers)) return c.json({ error: "tiers must be an array" }, 400);
     await scoringService.replaceScoring(id, { weight: body.weight, tiers: body.tiers });
   } catch (err) {
     const message = (err as Error).message;

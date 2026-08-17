@@ -8,15 +8,17 @@ attendance). Replaces a Google Sheet proof-of-concept — the Sheet is historica
 Phases 01–06 are built. New work lands as a dated spec/plan beside the existing ones.
 
 ## Read this first
+- **`docs/guides/`** — published user guides, one per app section. Keep them accurate when behaviour changes.
 - **`docs/specs/00_overview.md`** — entry point: vision, data model, service architecture, and the index
   of phase specs `01`–`06`. `07_llm_ingestion.md` plus the dated `YYYY-MM-DD_*.md` specs cover work
   layered on after the phases.
 - **`docs/data/`** — domain reference: `runbook.md` (deep detail on scoring & alias rules and gotchas),
   `roster.md` (canonical 86-member roster), `aliases.md` (alias → canonical mappings), `tracker.md`
   (event-history reference).
-- **`docs/fixtures/`** — gitignored reference-only TSVs documenting ingest column shape. Not test data,
-  not seed input. The `kvk_*` / `castlebattle_*` files document activity types **not in the v1 schema**
+- **`docs/fixtures/`** — reference-only TSVs documenting ingest column shape. Not test data, not seed
+  input. The `kvk_*` / `castlebattle_*` files document activity types **not in the v1 schema**
   (`bear_trap` / `contribution` / `mobilization`) — a hint for future types, not v1 scope.
+- Everything under `docs/` except `guides/` is gitignored (operator-private data and design notes).
 
 ## Workflow
 **No git worktrees.** Solo-dev project — work directly in this checkout, on a branch when the change
@@ -64,7 +66,7 @@ re-scored from the *current* config — no effective-dating (decided 2026-07-22)
 
 ## Rules that must not be softened (from runbook)
 - **Never fuzzy-match names.** Identity resolves via the `aliases` table only; the alliance runs deliberate
-  "Vega"/"Ember" decoy renames where similar names are *different people*. An unresolved name → NULL member
+  "Nova"/"Aurora" decoy renames where similar names are *different people*. An unresolved name → NULL member
   (surface it in the unmapped queue), never a guess.
 - **Log only participants with value > 0.** Strip the leading alliance tag (e.g. `[ABC]`) from raw names.
 - **Scoring is config-driven from DB tables and unit-tested** (never hardcoded): Bear flat 1/appearance;
